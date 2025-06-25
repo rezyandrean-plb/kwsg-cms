@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Sidebar from "../components/Sidebar";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +29,22 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
       >
-        {children}
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            {/* Navbar */}
+            <nav className="w-full h-16 flex items-center justify-end px-8 bg-white border-b shadow-sm">
+              <span className="font-medium text-gray-700 mr-4">John Doe</span>
+              <button className="p-2 rounded hover:bg-gray-100 transition-colors" title="Logout">
+                <FontAwesomeIcon icon={faSignOutAlt} className="text-2xl text-gray-500" />
+              </button>
+            </nav>
+            <main className="flex-1 p-8">{children}</main>
+          </div>
+        </div>
+        <Toaster />
       </body>
     </html>
   );
