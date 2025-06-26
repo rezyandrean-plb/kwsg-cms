@@ -29,7 +29,7 @@ export default function EditProjectPage() {
 
   useEffect(() => {
     if (params.id) {
-      fetch(`http://localhost:1337/api/projects/${params.id}`)
+      fetch(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${params.id}`)
         .then((res) => {
           if (!res.ok) throw new Error("Failed to fetch project");
           return res.json();

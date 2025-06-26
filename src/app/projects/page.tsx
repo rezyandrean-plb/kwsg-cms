@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   const [itemsPerPage] = useState(8);
 
   const fetchProjects = () => {
-    fetch("http://localhost:1337/api/projects/")
+    fetch("https://striking-hug-052e89dfad.strapiapp.com/api/projects/")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch projects");
         return res.json();
@@ -60,7 +60,7 @@ export default function ProjectsPage() {
   const handleDelete = (id: number) => {
     // Show confirmation dialog
     if (window.confirm("Are you sure you want to delete this project?")) {
-      fetch(`http://localhost:1337/api/projects/${id}`, {
+      fetch(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

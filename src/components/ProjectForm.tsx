@@ -60,7 +60,7 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
   useEffect(() => {
     const fetchDevelopers = async () => {
       try {
-        const response = await axios.get("http://localhost:1337/api/developers/");
+        const response = await axios.get("https://striking-hug-052e89dfad.strapiapp.com/api/developers/");
         setDevelopers(response.data.data || []);
       } catch (error) {
         console.error("Error fetching developers:", error);
@@ -164,14 +164,14 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
 
       // Send project data to backend (without files, just URLs)
       if (initialData) {
-        await axios.put(`http://localhost:1337/api/projects/${initialData.id}`, projectData, {
+        await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${initialData.id}`, projectData, {
           headers: {
             'Content-Type': 'application/json',
           },
         });
         toast.success("Project updated successfully!");
       } else {
-        await axios.post("http://localhost:1337/api/projects", projectData, {
+        await axios.post("https://striking-hug-052e89dfad.strapiapp.com/api/projects", projectData, {
           headers: {
             'Content-Type': 'application/json',
           },
