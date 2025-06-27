@@ -14,6 +14,7 @@ interface Project {
   property_type: string;
   developer: string;
   price: string;
+  display_price?: string;
   address: string;
   createdAt: string;
   images?: ProjectImage[];
@@ -163,7 +164,7 @@ export default function ProjectsPage() {
                     <td className="px-4 py-2">{project.project_name}</td>
                     <td className="px-4 py-2">{project.property_type}</td>
                     <td className="px-4 py-2">{project.developer}</td>
-                    <td className="px-4 py-2">{project.price}</td>
+                    <td className="px-4 py-2">{project.display_price || project.price || "N/A"}</td>
                     <td className="px-4 py-2">{project.address}</td>
                     <td className="px-4 py-2">
                       <div className="flex space-x-2">

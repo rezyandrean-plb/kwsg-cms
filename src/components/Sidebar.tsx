@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { FaTachometerAlt, FaFolder, FaBlog } from "react-icons/fa";
 
@@ -14,7 +15,13 @@ export default function Sidebar() {
   return (
     <aside className="bg-white min-h-screen w-56 border-r flex flex-col py-8 px-4 gap-2 shadow-sm">
       <div className="mb-8 flex items-center gap-2 px-2">
-        <span className="font-bold text-xl text-orange-500">KW Singapore</span>
+        <Image 
+          src="/logo-kwsg-colored.jpeg" 
+          alt="KW Singapore" 
+          width={120} 
+          height={40} 
+          className="object-contain"
+        />
       </div>
       <nav className="flex flex-col gap-2">
         {menuItems.map((item) => (
