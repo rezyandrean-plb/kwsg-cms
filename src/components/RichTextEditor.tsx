@@ -23,6 +23,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
   return (
     <div className="border-b border-gray-200 p-2 flex flex-wrap gap-1 bg-gray-50">
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleBold().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('bold') ? 'bg-gray-300' : ''}`}
         title="Bold"
@@ -30,6 +31,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaBold className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleItalic().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('italic') ? 'bg-gray-300' : ''}`}
         title="Italic"
@@ -37,6 +39,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaItalic className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('underline') ? 'bg-gray-300' : ''}`}
         title="Underline"
@@ -44,6 +47,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaUnderline className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleStrike().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('strike') ? 'bg-gray-300' : ''}`}
         title="Strikethrough"
@@ -54,6 +58,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
       <div className="w-px h-6 bg-gray-300 mx-1"></div>
       
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('heading', { level: 1 }) ? 'bg-gray-300' : ''}`}
         title="Heading 1"
@@ -61,6 +66,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaHeading className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('heading', { level: 2 }) ? 'bg-gray-300' : ''}`}
         title="Heading 2"
@@ -71,6 +77,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
       <div className="w-px h-6 bg-gray-300 mx-1"></div>
       
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('bulletList') ? 'bg-gray-300' : ''}`}
         title="Bullet List"
@@ -78,6 +85,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaListUl className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('orderedList') ? 'bg-gray-300' : ''}`}
         title="Numbered List"
@@ -88,6 +96,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
       <div className="w-px h-6 bg-gray-300 mx-1"></div>
       
       <button
+        type="button"
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'left' }) ? 'bg-gray-300' : ''}`}
         title="Align Left"
@@ -95,6 +104,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaAlignLeft className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().setTextAlign('center').run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'center' }) ? 'bg-gray-300' : ''}`}
         title="Align Center"
@@ -102,6 +112,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         <FaAlignCenter className="w-4 h-4" />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().setTextAlign('right').run()}
         className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'right' }) ? 'bg-gray-300' : ''}`}
         title="Align Right"
@@ -112,6 +123,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
       <div className="w-px h-6 bg-gray-300 mx-1"></div>
       
       <button
+        type="button"
         onClick={() => {
           const url = window.prompt('Enter URL');
           if (url) {
