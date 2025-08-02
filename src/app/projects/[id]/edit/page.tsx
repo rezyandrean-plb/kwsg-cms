@@ -28,6 +28,8 @@ export default function EditProjectPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('URL params:', params);
+    console.log('params.id type:', typeof params.id, 'Value:', params.id);
     if (params.id) {
       fetch(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${params.id}`)
         .then((res) => {
@@ -35,7 +37,10 @@ export default function EditProjectPage() {
           return res.json();
         })
         .then((data) => {
-          setProject(data.data || data);
+          const projectData = data.data || data;
+          console.log('Project data being passed to form:', projectData);
+          console.log('Project ID type:', typeof projectData.id, 'Value:', projectData.id);
+          setProject(projectData);
           setLoading(false);
         })
         .catch((err) => {
@@ -157,6 +162,7 @@ export default function EditProjectPage() {
           <div className="p-6">
             <ProjectForm
               initialData={project}
+              projectId={Array.isArray(params.id) ? params.id[0] : params.id}
               onSuccess={handleSuccess}
               onCancel={handleCancel}
             />

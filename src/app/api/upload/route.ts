@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
           Key: fileName,
           Body: buffer,
           ContentType: file.type,
-          ACL: 'public-read',
+          // Removed ACL since bucket has Object Ownership set to "Bucket owner enforced"
         });
 
         await s3Client.send(uploadCommand);

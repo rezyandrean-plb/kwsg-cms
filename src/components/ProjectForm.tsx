@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave, faTimes, faBuilding, faMapMarkerAlt, faCalendarAlt, faHome, faDollarSign, faLink, faUserTie, faImage, faTrash, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faSave, faTimes, faBuilding, faMapMarkerAlt, faCalendarAlt, faHome, faDollarSign, faLink, faUserTie, faImage, faTrash, faPlus, faBed, faBath, faRulerCombined, faLayerGroup, faGlobe, faTag, faInfoCircle, faSwimmingPool, faDumbbell, faCar, faTree, faWifi, faUtensils, faConciergeBell } from "@fortawesome/free-solid-svg-icons";
 import { extractImageUrls, getImageById, ProjectImage } from "@/lib/imageUtils";
 import { uploadFilesToS3, validateImageFiles } from "@/lib/uploadUtils";
+import CustomImageUpload from "./CustomImageUpload";
 
 type ProjectFormProps = {
   initialData?: any;
+  projectId?: string | number;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -29,32 +31,84 @@ const generateSlug = (text: string): string => {
     .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 };
 
-export default function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormProps) {
+export default function ProjectForm({ initialData, projectId, onSuccess, onCancel }: ProjectFormProps) {
+  console.log('ProjectForm received initialData:', initialData);
+  console.log('initialData.id type:', typeof initialData?.id, 'Value:', initialData?.id);
+  
   const [form, setForm] = useState({
     name: initialData?.name || "",
+    project_name: initialData?.project_name || "",
     slug: initialData?.slug || "",
+    title: initialData?.title || "",
     location: initialData?.location || "",
     address: initialData?.address || "",
-    developer: initialData?.developer || "",
+    developer: typeof initialData?.developer === 'object' ? initialData?.developer?.name : initialData?.developer || "",
     property_type: initialData?.property_type || "",
     tenure: initialData?.tenure || "",
     completion: initialData?.completion || "",
     units: initialData?.units || "",
+    total_units: initialData?.total_units || "",
     price_from: initialData?.price_from || "",
     price: initialData?.price || "",
+    price_per_sqft: initialData?.price_per_sqft || "",
+    bedrooms: initialData?.bedrooms || "",
+    bathrooms: initialData?.bathrooms || "",
+    size: initialData?.size || "",
+    total_floors: initialData?.total_floors || "",
+    site_area: initialData?.site_area || "",
+    district: initialData?.district || "",
+    type: initialData?.type || "",
+    status: initialData?.status || "",
+    description: initialData?.description || "",
+    latitude: initialData?.latitude || "",
+    longitude: initialData?.longitude || "",
   });
 
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [developers, setDevelopers] = useState([]);
   const [developersLoading, setDevelopersLoading] = useState(true);
+  const [facilities, setFacilities] = useState<string[]>(initialData?.facilities || []);
   
   // Image state
   const [currentImages, setCurrentImages] = useState<string[]>(
     extractImageUrls(initialData?.images)
   );
   const [newImages, setNewImages] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  // Facilities data
+  const facilitiesOptions = [
+    { value: "Swimming Pool", label: "Swimming Pool", icon: faSwimmingPool },
+    { value: "Gym", label: "Gym", icon: faDumbbell },
+    { value: "Car Park", label: "Car Park", icon: faCar },
+    { value: "Garden", label: "Garden", icon: faTree },
+    { value: "WiFi", label: "WiFi", icon: faWifi },
+    { value: "Restaurant", label: "Restaurant", icon: faUtensils },
+    { value: "Concierge", label: "Concierge", icon: faConciergeBell },
+    { value: "BBQ Area", label: "BBQ Area", icon: faUtensils },
+    { value: "Playground", label: "Playground", icon: faTree },
+    { value: "Tennis Court", label: "Tennis Court", icon: faDumbbell },
+    { value: "Basketball Court", label: "Basketball Court", icon: faDumbbell },
+    { value: "Spa", label: "Spa", icon: faConciergeBell },
+    { value: "Sauna", label: "Sauna", icon: faConciergeBell },
+    { value: "Function Room", label: "Function Room", icon: faBuilding },
+    { value: "Security", label: "Security", icon: faConciergeBell },
+    { value: "Lift", label: "Lift", icon: faBuilding },
+    { value: "Balcony", label: "Balcony", icon: faHome },
+    { value: "Air Conditioning", label: "Air Conditioning", icon: faHome },
+    { value: "Storage", label: "Storage", icon: faBuilding },
+    { value: "Pet Friendly", label: "Pet Friendly", icon: faHome },
+  ];
+
+  // Facilities handlers
+  const handleFacilityToggle = (facility: string) => {
+    setFacilities(prev => 
+      prev.includes(facility) 
+        ? prev.filter(f => f !== facility)
+        : [...prev, facility]
+    );
+  };
+
 
   // Fetch developers on component mount
   useEffect(() => {
@@ -74,18 +128,8 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
   }, []);
 
   // Handle image file selection
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const handleImageChange = (files: File[]) => {
     setNewImages(prev => [...prev, ...files]);
-    
-    // Create previews for new images
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreviews(prev => [...prev, e.target?.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
   };
 
   // Remove current image
@@ -96,16 +140,16 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
   // Remove new image
   const removeNewImage = (index: number) => {
     setNewImages(prev => prev.filter((_, i) => i !== index));
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm(prev => {
       const newForm = { ...prev, [name]: value };
-      // Auto-generate slug from name
+      // Auto-generate slug from name and populate project_name
       if (name === 'name') {
         newForm.slug = generateSlug(value);
+        newForm.project_name = value; // Also populate project_name with the same value
       }
       return newForm;
     });
@@ -114,6 +158,7 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setUploading(true);
     
     try {
       // Validate new images before upload
@@ -122,23 +167,24 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
         if (!validation.valid) {
           toast.error(`Validation errors: ${validation.errors.join(', ')}`);
           setLoading(false);
+          setUploading(false);
           return;
         }
       }
 
-      // Upload new images to S3 first
+      // Upload new images to S3
       let uploadedImageUrls: string[] = [];
       if (newImages.length > 0) {
-        setUploading(true);
-        toast.info("Uploading images to cloud storage...");
         const uploadResponse = await uploadFilesToS3(newImages, 'projects');
-        setUploading(false);
         
         if (!uploadResponse.success) {
-          const failedUploads = uploadResponse.results.filter(result => !result.success);
-          const errorMessages = failedUploads.map(result => `${result.fileName}: ${result.error}`).join(', ');
-          toast.error(`Failed to upload some images: ${errorMessages}`);
+          const errors = uploadResponse.results
+            .filter(result => !result.success)
+            .map(result => `${result.fileName}: ${result.error}`)
+            .join(', ');
+          toast.error(`Image upload failed: ${errors}`);
           setLoading(false);
+          setUploading(false);
           return;
         }
 
@@ -146,25 +192,35 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
         uploadedImageUrls = uploadResponse.results
           .filter(result => result.success && result.url)
           .map(result => result.url!);
-
-        if (uploadedImageUrls.length !== newImages.length) {
-          toast.warning("Some images failed to upload");
-        }
       }
+
+      // Combine current images with newly uploaded images
+      const allImageUrls = [...currentImages, ...uploadedImageUrls];
 
       // Prepare project data for database
       const projectData = {
         ...form,
-        // Combine current images (URLs) with newly uploaded images (URLs)
-        images: [
-          ...currentImages,
-          ...uploadedImageUrls
-        ]
+        images: allImageUrls, // Include all image URLs in the project data
+        facilities: facilities // Include facilities array
       };
 
-      // Send project data to backend (without files, just URLs)
+      // Send project data to backend
       if (initialData) {
-        await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${initialData.id}`, projectData, {
+        // Use the projectId prop if available, otherwise try to extract from initialData
+        const finalProjectId = projectId || (() => {
+          let id = initialData.id;
+          if (typeof id === 'object' && id !== null) {
+            id = id.id;
+          }
+          if (typeof id === 'string') {
+            id = parseInt(id, 10);
+          }
+          return id;
+        })();
+        
+        console.log('Final Project ID:', finalProjectId, 'Type:', typeof finalProjectId);
+        
+        await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`, projectData, {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -268,85 +324,16 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
         </div>
       </div>
 
-      {/* Images Section */}
-      <div className="space-y-6">
-        <div className="pb-2 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-            <FontAwesomeIcon icon={faImage} className="w-4 h-4 text-gray-500" />
-            <span>Project Images</span>
-          </h3>
-        </div>
-
-        {/* Current Images */}
-        {currentImages.length > 0 && (
-          <div className="space-y-4">
-            <Label className="text-sm font-medium text-gray-700">Current Images</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {currentImages.map((image, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={image}
-                    alt={`Project image ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeCurrentImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove image"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* New Images Preview */}
-        {imagePreviews.length > 0 && (
-          <div className="space-y-4">
-            <Label className="text-sm font-medium text-gray-700">New Images</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={preview}
-                    alt={`New image ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeNewImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove image"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Image Upload */}
-        <div className="space-y-2">
-          <Label htmlFor="images" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-            <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-gray-500" />
-            <span>Add Images</span>
-          </Label>
-          <Input 
-            id="images" 
-            name="images" 
-            type="file" 
-            multiple
-            accept="image/*"
-            onChange={handleImageChange}
-            className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-500">Upload multiple images (JPG, PNG, GIF)</p>
-        </div>
-      </div>
+      {/* Custom Image Upload Section */}
+      <CustomImageUpload
+        currentImages={currentImages}
+        newImages={newImages}
+        onImageChange={handleImageChange}
+        onRemoveCurrentImage={removeCurrentImage}
+        onRemoveNewImage={removeNewImage}
+        label="Project Images"
+        maxFiles={15}
+      />
 
       {/* Property Details Section */}
       <div className="space-y-6">
@@ -396,15 +383,8 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
               <option value="">Select property type</option>
               <option value="Apartment">Apartment</option>
               <option value="Condominium">Condominium</option>
-              <option value="Townhouse">Townhouse</option>
-              <option value="Semi-detached">Semi-detached</option>
-              <option value="Detached">Detached</option>
-              <option value="Office">Office</option>
-              <option value="Retail">Retail</option>
-              <option value="Industrial">Industrial</option>
-              <option value="Mixed-use">Mixed-use</option>
-              <option value="Hotel">Hotel</option>
-              <option value="Resort">Resort</option>
+              <option value="Luxury Condominium">Luxury Condominium</option>
+              <option value="Mixed Development">Mixed Development</option>
             </select>
           </div>
           
@@ -442,7 +422,7 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="units" className="text-sm font-medium text-gray-700">
               Number of Units
@@ -458,6 +438,370 @@ export default function ProjectForm({ initialData, onSuccess, onCancel }: Projec
               placeholder="e.g., 150"
             />
           </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="total_units" className="text-sm font-medium text-gray-700">
+              Total Units
+            </Label>
+            <Input 
+              id="total_units" 
+              name="total_units" 
+              value={form.total_units} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 142"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Unit Details Section */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <FontAwesomeIcon icon={faBed} className="w-4 h-4 text-blue-600" />
+            <span>Unit Details</span>
+          </h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="bedrooms" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <FontAwesomeIcon icon={faBed} className="w-3 h-3 text-gray-500" />
+              <span>Bedrooms</span>
+            </Label>
+            <Input 
+              id="bedrooms" 
+              name="bedrooms" 
+              value={form.bedrooms} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 2-4"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="bathrooms" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <FontAwesomeIcon icon={faBath} className="w-3 h-3 text-gray-500" />
+              <span>Bathrooms</span>
+            </Label>
+            <Input 
+              id="bathrooms" 
+              name="bathrooms" 
+              value={form.bathrooms} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 2-3"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="size" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <FontAwesomeIcon icon={faRulerCombined} className="w-3 h-3 text-gray-500" />
+              <span>Size Range</span>
+            </Label>
+            <Input 
+              id="size" 
+              name="size" 
+              value={form.size} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 732-1410 sq ft"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="price_per_sqft" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <FontAwesomeIcon icon={faDollarSign} className="w-3 h-3 text-gray-500" />
+              <span>Price per sq ft</span>
+            </Label>
+            <Input 
+              id="price_per_sqft" 
+              name="price_per_sqft" 
+              value={form.price_per_sqft} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., $2,500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Project Specifications Section */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <FontAwesomeIcon icon={faLayerGroup} className="w-4 h-4 text-blue-600" />
+            <span>Project Specifications</span>
+          </h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="total_floors" className="text-sm font-medium text-gray-700">
+              Total Floors
+            </Label>
+            <Input 
+              id="total_floors" 
+              name="total_floors" 
+              value={form.total_floors} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 25"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="site_area" className="text-sm font-medium text-gray-700">
+              Site Area
+            </Label>
+            <Input 
+              id="site_area" 
+              name="site_area" 
+              value={form.site_area} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 50,000 sq ft"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="type" className="text-sm font-medium text-gray-700">
+              Project Type
+            </Label>
+            <select
+              id="type"
+              name="type"
+              value={form.type}
+              onChange={handleChange}
+              className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="">Select project type</option>
+              <option value="Residential">Residential</option>
+              <option value="Commercial">Commercial</option>
+              <option value="Mixed Use">Mixed Use</option>
+              <option value="Industrial">Industrial</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Location & Status Section */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <FontAwesomeIcon icon={faGlobe} className="w-4 h-4 text-blue-600" />
+            <span>Location & Status</span>
+          </h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="district" className="text-sm font-medium text-gray-700">
+              District
+            </Label>
+            <select
+              id="district"
+              name="district"
+              value={form.district}
+              onChange={handleChange}
+              className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="">Select district</option>
+              <option value="D01">D01 - Raffles Place, Marina, Cecil</option>
+              <option value="D02">D02 - Tanjong Pagar, Chinatown</option>
+              <option value="D03">D03 - Queenstown, Tiong Bahru</option>
+              <option value="D04">D04 - Telok Blangah, Harbourfront</option>
+              <option value="D05">D05 - Buona Vista, West Coast, Clementi</option>
+              <option value="D06">D06 - City Hall, Clarke Quay</option>
+              <option value="D07">D07 - Bugis, Rochor, Golden Mile</option>
+              <option value="D08">D08 - Little India, Farrer Park</option>
+              <option value="D09">D09 - Orchard, River Valley</option>
+              <option value="D10">D10 - Tanglin, Holland, Bukit Timah</option>
+              <option value="D11">D11 - Novena, Thomson, Toa Payoh</option>
+              <option value="D12">D12 - Balestier, Toa Payoh, Serangoon</option>
+              <option value="D13">D13 - Macpherson, Braddell</option>
+              <option value="D14">D14 - Geylang, Eunos, Paya Lebar</option>
+              <option value="D15">D15 - Katong, Joo Chiat, Amber Road</option>
+              <option value="D16">D16 - Bedok, Upper East Coast</option>
+              <option value="D17">D17 - Changi, Loyang, Pasir Ris</option>
+              <option value="D18">D18 - Tampines, Pasir Ris</option>
+              <option value="D19">D19 - Hougang, Punggol, Sengkang</option>
+              <option value="D20">D20 - Ang Mo Kio, Bishan, Thomson</option>
+              <option value="D21">D21 - Upper Bukit Timah, Clementi Park</option>
+              <option value="D22">D22 - Jurong, Boon Lay</option>
+              <option value="D23">D23 - Bukit Batok, Choa Chu Kang</option>
+              <option value="D24">D24 - Lim Chu Kang, Tengah</option>
+              <option value="D25">D25 - Kranji, Woodgrove</option>
+              <option value="D26">D26 - Upper Thomson, Springleaf</option>
+              <option value="D27">D27 - Yishun, Sembawang</option>
+              <option value="D28">D28 - Seletar, Yio Chu Kang</option>
+            </select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="status" className="text-sm font-medium text-gray-700">
+              Project Status
+            </Label>
+            <select
+              id="status"
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="">Select status</option>
+              <option value="Launching Soon">Launching Soon</option>
+              <option value="New Launch">New Launch</option>
+              <option value="Under Construction">Under Construction</option>
+              <option value="Ready for Move-in">Ready for Move-in</option>
+              <option value="Completed">Completed</option>
+              <option value="Sold Out">Sold Out</option>
+            </select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-sm font-medium text-gray-700">
+              Project Title
+            </Label>
+            <Input 
+              id="title" 
+              name="title" 
+              value={form.title} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="Enter project title"
+            />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="latitude" className="text-sm font-medium text-gray-700">
+              Latitude
+            </Label>
+            <Input 
+              id="latitude" 
+              name="latitude" 
+              value={form.latitude} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 1.3521"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="longitude" className="text-sm font-medium text-gray-700">
+              Longitude
+            </Label>
+            <Input 
+              id="longitude" 
+              name="longitude" 
+              value={form.longitude} 
+              onChange={handleChange} 
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g., 103.8198"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Description Section */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-blue-600" />
+            <span>Project Description</span>
+          </h3>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+            Description
+          </Label>
+          <textarea
+            id="description"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            rows={4}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none resize-none"
+            placeholder="Enter detailed project description..."
+          />
+        </div>
+      </div>
+
+      {/* Facilities Section */}
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <FontAwesomeIcon icon={faConciergeBell} className="w-4 h-4 text-blue-600" />
+            <span>Facilities & Amenities</span>
+          </h3>
+        </div>
+        
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Select the facilities and amenities available in this project
+          </p>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {facilitiesOptions.map((facility) => (
+              <div
+                key={facility.value}
+                className={`relative flex items-center p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                  facilities.includes(facility.value)
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                }`}
+                onClick={() => handleFacilityToggle(facility.value)}
+              >
+                <input
+                  type="checkbox"
+                  checked={facilities.includes(facility.value)}
+                  onChange={() => handleFacilityToggle(facility.value)}
+                  className="sr-only"
+                />
+                <div className="flex items-center space-x-2 w-full">
+                  <FontAwesomeIcon 
+                    icon={facility.icon} 
+                    className={`w-4 h-4 ${
+                      facilities.includes(facility.value) ? 'text-blue-600' : 'text-gray-500'
+                    }`} 
+                  />
+                  <span className="text-sm font-medium">{facility.label}</span>
+                </div>
+                {facilities.includes(facility.value) && (
+                  <div className="absolute top-1 right-1">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {facilities.length > 0 && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Facilities ({facilities.length}):</p>
+              <div className="flex flex-wrap gap-2">
+                {facilities.map((facility) => (
+                  <span
+                    key={facility}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                  >
+                    {facility}
+                    <button
+                      type="button"
+                      onClick={() => handleFacilityToggle(facility)}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,16 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { FaTachometerAlt, FaFolder, FaBlog } from "react-icons/fa";
+import { FaTachometerAlt, FaFolder, FaNewspaper } from "react-icons/fa";
 
 const menuItems = [
   { name: "Dashboard", href: "/", icon: <FaTachometerAlt className="text-xl" /> },
   { name: "Projects", href: "/projects", icon: <FaFolder className="text-xl" /> },
-  { name: "Blogs", href: "/blogs", icon: <FaBlog className="text-xl" /> },
+  { name: "Press", href: "/press", icon: <FaNewspaper className="text-xl" /> },
 ];
 
 export default function Sidebar() {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const pathname = usePathname();
 
   return (
     <aside className="bg-white min-h-screen w-56 border-r flex flex-col py-8 px-4 gap-2 shadow-sm">

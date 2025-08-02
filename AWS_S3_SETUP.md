@@ -18,6 +18,7 @@ This guide will help you configure AWS S3 for image uploads in the KWSG Projects
    - **Block Public Access**: Uncheck "Block all public access" (since we need public read access for images)
    - **Bucket Versioning**: Optional
    - **Default Encryption**: Enable server-side encryption
+   - **Object Ownership**: Set to "Bucket owner enforced" (this disables ACLs and uses bucket policy for access control)
 6. Click "Create bucket"
 
 ## Step 2: Configure Bucket Policy
@@ -40,6 +41,8 @@ Add the following bucket policy to allow public read access:
 ```
 
 Replace `YOUR_BUCKET_NAME` with your actual bucket name.
+
+**Important**: Since we're using "Bucket owner enforced" Object Ownership, this bucket policy is required for public read access. ACLs are disabled, so the bucket policy controls all access.
 
 ## Step 3: Create IAM User
 
@@ -129,6 +132,7 @@ Replace the values with your actual AWS configuration:
    - Verify your IAM user has the correct permissions
    - Check that the bucket policy allows public read access
    - Ensure the access keys are correct
+   - Verify Object Ownership is set to "Bucket owner enforced"
 
 3. **"Region mismatch" error**
    - Make sure `AWS_REGION` matches your bucket's region
@@ -136,6 +140,7 @@ Replace the values with your actual AWS configuration:
 4. **Images not displaying**
    - Check that the bucket policy allows public read access
    - Verify the S3 URLs are correct in the database
+   - Ensure Object Ownership is set to "Bucket owner enforced"
 
 ### Debug Mode
 

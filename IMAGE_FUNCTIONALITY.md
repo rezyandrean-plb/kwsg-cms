@@ -183,10 +183,10 @@ const projectData = {
 - **Server-side Validation**: All uploads validated on server
 
 ### S3 Security
-- **Public Read Access**: Images are publicly readable
+- **Public Read Access**: Images are publicly readable via bucket policy
 - **Private Upload**: Uploads go through secure API route
 - **Unique Filenames**: Prevents filename conflicts
-- **ACL Control**: Files set to public-read for display
+- **Bucket Policy Control**: Public access controlled by bucket policy (ACLs disabled)
 
 ## Styling
 - Uses Tailwind CSS for responsive design
