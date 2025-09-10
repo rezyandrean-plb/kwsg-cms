@@ -11,12 +11,21 @@ import { extractImageUrls, ProjectImage } from "@/lib/imageUtils";
 interface Project {
   id: number;
   name: string;
-  property_type: string;
-  developer: string;
+  type: string;
+  developer: {
+    name: string;
+    description?: string;
+    logo_url?: string;
+    website?: string;
+    contact_email?: string;
+    contact_phone?: string;
+  };
   price: string;
-  address: string;
-  createdAt: string;
-  project_name?: string;
+  price_from?: string;
+  location: string;
+  created_at?: string;
+  updated_at?: string;
+  image_url_banner?: string;
   images?: ProjectImage[];
 }
 
@@ -123,7 +132,7 @@ export default function EditProjectPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Edit Project</h1>
                   <p className="text-gray-600 mt-1">
-                    Update information for "{project.project_name || project.name}"
+                    Update information for "{project.name}"
                   </p>
                 </div>
               </div>

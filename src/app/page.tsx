@@ -17,16 +17,27 @@ import {
   faPlus
 } from "@fortawesome/free-solid-svg-icons";
 import { ProjectImage } from "@/lib/imageUtils";
+import { getDeveloperName } from "@/lib/developerUtils";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Project {
   id: number;
-  project_name: string;
-  property_type: string;
-  developer: string;
+  name: string;
+  type: string;
+  developer: {
+    name: string;
+    description?: string;
+    logo_url?: string;
+    website?: string;
+    contact_email?: string;
+    contact_phone?: string;
+  };
   price: string;
-  address: string;
-  createdAt: string;
+  price_from?: string;
+  location: string;
+  created_at?: string;
+  updated_at?: string;
+  image_url_banner?: string;
   images?: ProjectImage[];
 }
 
@@ -76,21 +87,41 @@ export default function Dashboard() {
     let totalValue = 0;
     let under500k = 0, under1m = 0, under2m = 0, over2m = 0;
 
+    // Handle empty projects array
+    if (!projects || projects.length === 0) {
+      return {
+        totalProjects: 0,
+        totalValue: 0,
+        averagePrice: 0,
+        propertyTypes: {},
+        topDevelopers: {},
+        recentProjects: [],
+        priceRange: { under500k: 0, under1m: 0, under2m: 0, over2m: 0 }
+      };
+    }
+
     projects.forEach(project => {
-      // Count property types
-      propertyTypes[project.property_type] = (propertyTypes[project.property_type] || 0) + 1;
+      // Count property types (handle undefined/null type)
+      if (project.type) {
+        propertyTypes[project.type] = (propertyTypes[project.type] || 0) + 1;
+      }
       
-      // Count developers
-      developers[project.developer] = (developers[project.developer] || 0) + 1;
+      // Count developers (handle undefined/null developer)
+      if (project.developer) {
+        const developerName = getDeveloperName(project.developer);
+        developers[developerName] = (developers[developerName] || 0) + 1;
+      }
       
       // Calculate price statistics
-      const price = parseFloat(project.price.replace(/[^0-9.]/g, ''));
-      if (!isNaN(price)) {
-        totalValue += price;
-        if (price < 500000) under500k++;
-        else if (price < 1000000) under1m++;
-        else if (price < 2000000) under2m++;
-        else over2m++;
+      if (project.price) {
+        const price = parseFloat(project.price.replace(/[^0-9.]/g, ''));
+        if (!isNaN(price)) {
+          totalValue += price;
+          if (price < 500000) under500k++;
+          else if (price < 1000000) under1m++;
+          else if (price < 2000000) under2m++;
+          else over2m++;
+        }
       }
     });
 
@@ -101,7 +132,7 @@ export default function Dashboard() {
 
     // Get recent projects (last 5)
     const recentProjects = projects
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => new Date(b.updated_at || b.created_at || '').getTime() - new Date(a.updated_at || a.created_at || '').getTime())
       .slice(0, 5);
 
     return {
@@ -192,7 +223,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.totalProjects}</p>
+                    <p className="text-md font-bold text-gray-900">{stats.totalProjects}</p>
                   </div>
                 </div>
               </div>
@@ -204,7 +235,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Portfolio Value</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalValue)}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(stats.totalValue)}</p>
                   </div>
                 </div>
               </div>
@@ -216,7 +247,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Average Price</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.averagePrice)}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(stats.averagePrice)}</p>
                   </div>
                 </div>
               </div>
@@ -228,7 +259,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Property Types</p>
-                    <p className="text-2xl font-bold text-gray-900">{Object.keys(stats.propertyTypes).length}</p>
+                    <p className="text-md font-bold text-gray-900">{Object.keys(stats.propertyTypes).length}</p>
                   </div>
                 </div>
               </div>
@@ -240,22 +271,28 @@ export default function Dashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Types Distribution</h3>
                 <div className="space-y-3">
-                  {Object.entries(stats.propertyTypes).map(([type, count]) => (
-                    <div key={type} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{type}</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-32 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${(count / stats.totalProjects) * 100}%` }}
-                          ></div>
+                  {stats.propertyTypes && Object.keys(stats.propertyTypes).length > 0 ? (
+                    Object.entries(stats.propertyTypes).map(([type, count]) => (
+                      <div key={type} className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">{type}</span>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-32 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full" 
+                              style={{ width: `${(count / stats.totalProjects) * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-600 w-12 text-right">
+                            {count} ({formatPercentage(count, stats.totalProjects)}%)
+                          </span>
                         </div>
-                        <span className="text-sm text-gray-600 w-12 text-right">
-                          {count} ({formatPercentage(count, stats.totalProjects)}%)
-                        </span>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No property types data available</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -329,21 +366,27 @@ export default function Dashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Developers</h3>
                 <div className="space-y-3">
-                  {Object.entries(stats.topDevelopers).map(([developer, count], index) => (
-                    <div key={developer} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-500' : 
-                          index === 1 ? 'bg-gray-400' : 
-                          index === 2 ? 'bg-orange-500' : 'bg-blue-500'
-                        }`}>
-                          {index + 1}
+                  {stats.topDevelopers && Object.keys(stats.topDevelopers).length > 0 ? (
+                    Object.entries(stats.topDevelopers).map(([developer, count], index) => (
+                      <div key={developer} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                            index === 0 ? 'bg-yellow-500' : 
+                            index === 1 ? 'bg-gray-400' : 
+                            index === 2 ? 'bg-orange-500' : 'bg-blue-500'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <span className="font-medium text-gray-900">{developer}</span>
                         </div>
-                        <span className="font-medium text-gray-900">{developer}</span>
+                        <span className="text-sm text-gray-600">{count} projects</span>
                       </div>
-                      <span className="text-sm text-gray-600">{count} projects</span>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No developer data available</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -359,23 +402,29 @@ export default function Dashboard() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {stats.recentProjects.map((project) => (
-                    <div key={project.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <FontAwesomeIcon icon={faBuilding} className="w-5 h-5 text-blue-600" />
+                  {stats.recentProjects && stats.recentProjects.length > 0 ? (
+                    stats.recentProjects.map((project) => (
+                      <div key={project.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <FontAwesomeIcon icon={faBuilding} className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{project.name}</p>
+                            <p className="text-sm text-gray-600">{project.type}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{project.project_name}</p>
-                          <p className="text-sm text-gray-600">{project.property_type}</p>
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900">{project.price}</p>
+                          <p className="text-sm text-gray-600">{getDeveloperName(project.developer)}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">{project.price}</p>
-                        <p className="text-sm text-gray-600">{project.developer}</p>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No recent projects available</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
