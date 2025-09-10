@@ -11,6 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave, faTimes, faBuilding, faMapMarkerAlt, faCalendarAlt, faHome, faDollarSign, faLink, faUserTie, faImage, faTrash, faPlus, faBed, faBath, faRulerCombined, faLayerGroup, faGlobe, faTag, faInfoCircle, faSwimmingPool, faDumbbell, faCar, faTree, faWifi, faUtensils, faConciergeBell } from "@fortawesome/free-solid-svg-icons";
 import { extractImageUrls, getImageById, ProjectImage } from "@/lib/imageUtils";
 import { uploadFilesToS3, validateImageFiles } from "@/lib/uploadUtils";
+import { getDeveloperFormValue } from "@/lib/developerUtils";
 import CustomImageUpload from "./CustomImageUpload";
 
 type ProjectFormProps = {
@@ -35,15 +36,37 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
   console.log('ProjectForm received initialData:', initialData);
   console.log('initialData.id type:', typeof initialData?.id, 'Value:', initialData?.id);
   
+  // Normalize API response data to avoid nulls in controlled inputs
+  const normalizeFormData = (data: any) => {
+    const fields = [
+      'name', 'slug', 'title', 'overview_quote', 'location', 'type', 'tenure', 'completion',
+      'units', 'total_units', 'price_from', 'price', 'price_per_sqft', 'bedrooms', 'bathrooms',
+      'size', 'total_floors', 'site_area', 'district', 'status', 'description', 'latitude', 'longitude'
+    ];
+    const normalized: any = {};
+    for (const key of fields) {
+      const value = data?.[key];
+      normalized[key] = value == null ? '' : value;
+    }
+    // Developer can come back as object or string
+    if (typeof data?.developer === 'string') {
+      normalized.developer = data.developer;
+    } else if (data?.developer?.name) {
+      normalized.developer = data.developer.name;
+    } else if (data?.developer?.attributes?.name) {
+      normalized.developer = data.developer.attributes.name;
+    }
+    return normalized;
+  };
+
   const [form, setForm] = useState({
     name: initialData?.name || "",
-    project_name: initialData?.project_name || "",
     slug: initialData?.slug || "",
     title: initialData?.title || "",
+    overview_quote: initialData?.overview_quote || "",
     location: initialData?.location || "",
-    address: initialData?.address || "",
-    developer: typeof initialData?.developer === 'object' ? initialData?.developer?.name : initialData?.developer || "",
-    property_type: initialData?.property_type || "",
+    developer: getDeveloperFormValue(initialData?.developer),
+    type: initialData?.type || "",
     tenure: initialData?.tenure || "",
     completion: initialData?.completion || "",
     units: initialData?.units || "",
@@ -57,18 +80,25 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
     total_floors: initialData?.total_floors || "",
     site_area: initialData?.site_area || "",
     district: initialData?.district || "",
-    type: initialData?.type || "",
     status: initialData?.status || "",
     description: initialData?.description || "",
     latitude: initialData?.latitude || "",
     longitude: initialData?.longitude || "",
   });
 
+  const [step, setStep] = useState<1 | 2>(1);
+
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [developers, setDevelopers] = useState([]);
+  const [savingOverview, setSavingOverview] = useState(false);
+  const [developers, setDevelopers] = useState<any[]>([]);
   const [developersLoading, setDevelopersLoading] = useState(true);
-  const [facilities, setFacilities] = useState<string[]>(initialData?.facilities || []);
+  const [createdProjectId, setCreatedProjectId] = useState<string | number | null>(null);
+  const [facilities, setFacilities] = useState<string[]>(() => {
+    const initialFacilities = initialData?.facilities || [];
+    // Remove duplicates from initial facilities
+    return [...new Set(initialFacilities)] as string[];
+  });
   
   // Image state
   const [currentImages, setCurrentImages] = useState<string[]>(
@@ -102,30 +132,44 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
 
   // Facilities handlers
   const handleFacilityToggle = (facility: string) => {
-    setFacilities(prev => 
-      prev.includes(facility) 
-        ? prev.filter(f => f !== facility)
-        : [...prev, facility]
-    );
+    setFacilities(prev => {
+      if (prev.includes(facility)) {
+        // Remove the facility if it exists
+        return prev.filter(f => f !== facility);
+      } else {
+        // Add the facility if it doesn't exist (prevent duplicates)
+        return [...prev, facility];
+      }
+    });
   };
 
 
-  // Fetch developers on component mount
+  // Fetch developers when entering Step 2
   useEffect(() => {
+    if (step !== 2) return;
+
     const fetchDevelopers = async () => {
       try {
         const response = await axios.get("https://striking-hug-052e89dfad.strapiapp.com/api/developers/");
         setDevelopers(response.data.data || []);
-      } catch (error) {
-        console.error("Error fetching developers:", error);
-        toast.error("Failed to load developers");
+      } catch (error: any) {
+        // Handle 403 specifically - developers endpoint might not be publicly accessible
+        if (error.response?.status === 403) {
+          console.warn("Developers endpoint is not publicly accessible. Using fallback.");
+          // Set a fallback developer option
+          setDevelopers([{ id: 'manual', name: 'Manual Entry' }]);
+        } else {
+          console.error("Error fetching developers:", error);
+          toast.error("Failed to load developers");
+        }
       } finally {
         setDevelopersLoading(false);
       }
     };
 
+    setDevelopersLoading(true);
     fetchDevelopers();
-  }, []);
+  }, [step]);
 
   // Handle image file selection
   const handleImageChange = (files: File[]) => {
@@ -146,10 +190,9 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
     const { name, value } = e.target;
     setForm(prev => {
       const newForm = { ...prev, [name]: value };
-      // Auto-generate slug from name and populate project_name
+      // Auto-generate slug from name
       if (name === 'name') {
         newForm.slug = generateSlug(value);
-        newForm.project_name = value; // Also populate project_name with the same value
       }
       return newForm;
     });
@@ -197,16 +240,39 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
       // Combine current images with newly uploaded images
       const allImageUrls = [...currentImages, ...uploadedImageUrls];
 
-      // Prepare project data for database
+      // Prepare project data for database with Strapi format
       const projectData = {
-        ...form,
-        images: allImageUrls, // Include all image URLs in the project data
-        facilities: facilities // Include facilities array
+        data: {
+          name: form.name,
+          slug: form.slug,
+          title: form.title,
+          overview_quote: form.overview_quote,
+          location: form.location,
+          developer: { name: form.developer },
+          type: form.type,
+          tenure: form.tenure,
+          completion: form.completion,
+          units: form.units,
+          total_units: form.total_units,
+          price_from: form.price_from,
+          price: form.price,
+          price_per_sqft: form.price_per_sqft,
+          bedrooms: form.bedrooms,
+          bathrooms: form.bathrooms,
+          size: form.size,
+          total_floors: form.total_floors,
+          site_area: form.site_area,
+          description: form.description,
+          status: form.status,
+          image_url_banner: allImageUrls[0] || null, // Use first image as banner
+          images: allImageUrls, // Include all image URLs in the project data
+          facilities: facilities // Include facilities array
+        }
       };
 
       // Send project data to backend
       if (initialData) {
-        // Use the projectId prop if available, otherwise try to extract from initialData
+        // Update existing project - complete data
         const finalProjectId = projectId || (() => {
           let id = initialData.id;
           if (typeof id === 'object' && id !== null) {
@@ -220,34 +286,322 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
         
         console.log('Final Project ID:', finalProjectId, 'Type:', typeof finalProjectId);
         
-        await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`, projectData, {
+        console.log('=== PROJECT UPDATE DEBUG ===');
+        console.log('Final Project ID:', finalProjectId);
+        console.log('Update URL:', `https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`);
+        console.log('Request payload:', JSON.stringify(projectData, null, 2));
+        
+        const response = await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`, projectData, {
           headers: {
             'Content-Type': 'application/json',
           },
         });
+        
+        console.log('Response status:', response.status);
+        console.log('Response data:', response.data);
+        
+        // Update form state with response data if available
+        if (response.data?.data) {
+          setForm(prev => ({
+            ...prev,
+            ...normalizeFormData(response.data.data),
+            developer: normalizeFormData(response.data.data).developer ?? prev.developer,
+          }));
+        }
+        
         toast.success("Project updated successfully!");
       } else {
-        await axios.post("https://striking-hug-052e89dfad.strapiapp.com/api/projects", projectData, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        toast.success("Project created successfully!");
+        // For new projects, use the created project ID from Step 1
+        if (createdProjectId) {
+          // Update the existing project created in Step 1
+          const response = await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${createdProjectId}`, projectData, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          // Update form state with response data if available
+          if (response.data?.data) {
+            setForm(prev => ({
+              ...prev,
+              ...normalizeFormData(response.data.data),
+              developer: normalizeFormData(response.data.data).developer ?? prev.developer,
+            }));
+          }
+          
+          toast.success("Project completed successfully!");
+        } else {
+          // Fallback: create new project with complete data
+          const response = await axios.post("https://striking-hug-052e89dfad.strapiapp.com/api/projects", projectData, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          // Update form state with created project data
+          if (response.data?.data) {
+            setForm(prev => ({
+              ...prev,
+              ...normalizeFormData(response.data.data),
+              developer: normalizeFormData(response.data.data).developer ?? prev.developer,
+            }));
+          }
+          
+          toast.success("Project created successfully!");
+        }
       }
       
       onSuccess?.();
-    } catch (err) {
-      console.error('Error saving project:', err);
-      toast.error("Error saving project");
+    } catch (err: any) {
+      console.error('=== PROJECT SAVE ERROR ===');
+      console.error('Full error object:', err);
+      console.error('Error response:', err.response);
+      console.error('Error response data:', err.response?.data);
+      console.error('Error response status:', err.response?.status);
+      console.error('Error response headers:', err.response?.headers);
+      
+      // Handle specific error cases
+      if (err.response?.data?.error?.message) {
+        console.error('Strapi error message:', err.response.data.error.message);
+        toast.error(`Error: ${err.response.data.error.message}`);
+      } else if (err.response?.data?.message) {
+        console.error('API error message:', err.response.data.message);
+        toast.error(`Error: ${err.response.data.message}`);
+      } else if (err.response?.status === 400) {
+        console.error('400 Bad Request - Validation error');
+        toast.error('Validation error. Please check your input fields.');
+      } else if (err.response?.status === 401) {
+        console.error('401 Unauthorized - Authentication required');
+        toast.error('Authentication required. Please log in again.');
+      } else if (err.response?.status === 403) {
+        console.error('403 Forbidden - Permission denied');
+        toast.error('Permission denied. You may not have access to update this project.');
+      } else if (err.response?.status === 404) {
+        console.error('404 Not Found');
+        toast.error('Project not found. Please refresh and try again.');
+      } else if (err.response?.status === 500) {
+        console.error('500 Server Error');
+        toast.error('Server error. Please try again later.');
+      } else if (err.code === 'NETWORK_ERROR') {
+        console.error('Network Error');
+        toast.error('Network error. Please check your connection.');
+      } else {
+        console.error('Unknown error');
+        toast.error("Error saving project. Please try again.");
+      }
     } finally {
       setLoading(false);
       setUploading(false);
     }
   };
 
+  const handleSubmitOverview = async () => {
+    setSavingOverview(true);
+    try {
+      // Try both formats - Strapi v4 format and direct format
+      const overviewDataStrapi = {
+        data: {
+          title: form.title,
+          description: form.description,
+          overview_quote: form.overview_quote,
+        }
+      };
+      
+      const overviewDataDirect = {
+        title: form.title,
+        description: form.description,
+        overview_quote: form.overview_quote,
+      };
+      
+      // Use Strapi format by default, but we can switch if needed
+      const overviewData = overviewDataStrapi;
+
+      console.log('=== OVERVIEW SAVE DEBUG ===');
+      console.log('Form data:', { title: form.title, description: form.description, overview_quote: form.overview_quote });
+      console.log('Request payload:', JSON.stringify(overviewData, null, 2));
+      console.log('Has initialData:', !!initialData);
+      console.log('ProjectId prop:', projectId);
+      
+      // Validate required fields
+      if (!form.title || !form.description) {
+        toast.error('Title and description are required fields.');
+        setSavingOverview(false);
+        return;
+      }
+
+      if (initialData) {
+        // Update existing project - only overview fields
+        const finalProjectId = projectId || (() => {
+          let id = initialData.id;
+          if (typeof id === 'object' && id !== null) {
+            // In case Strapi returns nested id
+            id = id.id;
+          }
+          if (typeof id === 'string') {
+            id = parseInt(id, 10);
+          }
+          return id;
+        })();
+
+        console.log('Final Project ID for update:', finalProjectId);
+        console.log('Update URL:', `https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`);
+
+        let response;
+        try {
+          response = await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`, overviewData, {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (firstError: any) {
+          if (firstError.response?.status === 400) {
+            console.log('Strapi format failed, trying direct format...');
+            response = await axios.put(`https://striking-hug-052e89dfad.strapiapp.com/api/projects/${finalProjectId}`, overviewDataDirect, {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          } else {
+            throw firstError;
+          }
+        }
+        
+        // Update the initialData with the response to maintain state
+        if (response.data?.data) {
+          setForm(prev => ({
+            ...prev,
+            title: response.data.data.title || prev.title,
+            description: response.data.data.description || prev.description,
+            overview_quote: response.data.data.overview_quote || prev.overview_quote,
+          }));
+        }
+        
+        toast.success('Overview saved successfully');
+      } else {
+        // Create minimal project with overview fields
+        console.log('Creating new project with overview data');
+        console.log('Create URL:', 'https://striking-hug-052e89dfad.strapiapp.com/api/projects');
+        
+        let response;
+        try {
+          response = await axios.post('https://striking-hug-052e89dfad.strapiapp.com/api/projects', overviewData, {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (firstError: any) {
+          if (firstError.response?.status === 400) {
+            console.log('Strapi format failed, trying direct format...');
+            response = await axios.post('https://striking-hug-052e89dfad.strapiapp.com/api/projects', overviewDataDirect, {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          } else {
+            throw firstError;
+          }
+        }
+        
+        // Store the created project ID for Step 2
+        if (response.data?.data?.id) {
+          const newProjectId = response.data.data.id;
+          setCreatedProjectId(newProjectId);
+          
+          toast.success('Overview created successfully. You can now proceed to Step 2.');
+        } else {
+          toast.error('Overview created but could not retrieve project ID');
+        }
+      }
+    } catch (err: any) {
+      console.error('=== OVERVIEW SAVE ERROR ===');
+      console.error('Full error object:', err);
+      console.error('Error response:', err.response);
+      console.error('Error response data:', err.response?.data);
+      console.error('Error response status:', err.response?.status);
+      console.error('Error response headers:', err.response?.headers);
+      
+      // Handle specific error cases
+      if (err.response?.data?.error?.message) {
+        console.error('Strapi error message:', err.response.data.error.message);
+        toast.error(`Error: ${err.response.data.error.message}`);
+      } else if (err.response?.data?.message) {
+        console.error('API error message:', err.response.data.message);
+        toast.error(`Error: ${err.response.data.message}`);
+      } else if (err.response?.status === 400) {
+        console.error('400 Bad Request - Validation error');
+        toast.error('Validation error. Please check your input.');
+      } else if (err.response?.status === 404) {
+        console.error('404 Not Found');
+        toast.error('Project not found. Please refresh and try again.');
+      } else {
+        console.error('Unknown error');
+        toast.error('Error saving overview. Please try again.');
+      }
+    } finally {
+      setSavingOverview(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Basic Information Section */}
+      {/* Step Indicator */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`px-2 py-1 rounded ${step === 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Step 1: Overview</span>
+          <span className={`px-2 py-1 rounded ${step === 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Step 2: Details</span>
+        </div>
+      </div>
+
+      {step === 1 && (
+        <div className="space-y-6">
+          <div className="pb-2 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Project Overview</h3>
+            <p className="text-sm text-gray-600 mt-1">Content used at the top of the project page.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="title" className="text-sm font-medium text-gray-700">
+                Project Title
+              </Label>
+              <Input 
+                id="title" 
+                name="title" 
+                value={form.title} 
+                onChange={handleChange} 
+                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Enter project title"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+              Description
+            </Label>
+            <textarea
+              id="description"
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              rows={4}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none resize-none"
+              placeholder="Enter detailed project description..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="overview_quote" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <FontAwesomeIcon icon={faInfoCircle} className="w-3 h-3 text-gray-500" />
+              <span>Signature Quote</span>
+            </Label>
+            <textarea
+              id="overview_quote"
+              name="overview_quote"
+              value={form.overview_quote}
+              onChange={handleChange}
+              rows={2}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none resize-none"
+              placeholder="e.g., Where modern architecture meets timeless elegance..."
+            />
+            <p className="text-xs text-gray-500">Shown below the description in a highlighted callout.</p>
+          </div>
+        </div>
+      )}
+      {/* Basic Information Section (Step 2 only) */}
+      {step === 2 && (
       <div className="space-y-6">
         <div className="pb-2 border-b border-gray-200">
         </div>
@@ -307,23 +661,13 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="address" className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-              <FontAwesomeIcon icon={faMapMarkerAlt} className="w-3 h-3 text-gray-500" />
-              <span>Address</span>
-            </Label>
-            <Input 
-              id="address" 
-              name="address" 
-              value={form.address} 
-              onChange={handleChange} 
-              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              placeholder="Enter full project address"
-            />
-          </div>
+          
         </div>
       </div>
+      )}
 
+      {step === 2 && (
+      <>
       {/* Custom Image Upload Section */}
       <CustomImageUpload
         currentImages={currentImages}
@@ -347,35 +691,55 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
               <span>Developer</span>
               <span className="text-red-500">*</span>
             </Label>
-            <select
-              id="developer"
-              name="developer"
-              value={form.developer}
-              onChange={handleChange}
-              required
-              disabled={developersLoading}
-              className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              <option value="">
-                {developersLoading ? "Loading developers..." : "Select developer"}
-              </option>
-              {developers.map((developer: any) => (
-                <option key={developer.id} value={developer.attributes?.name || developer.name}>
-                  {developer.attributes?.name || developer.name}
+            {developers.length > 0 && developers[0]?.id !== 'manual' ? (
+              <select
+                id="developer"
+                name="developer"
+                value={form.developer}
+                onChange={handleChange}
+                required
+                disabled={developersLoading}
+                className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {developersLoading ? "Loading developers..." : "Select developer"}
                 </option>
-              ))}
-            </select>
+                {developers.map((developer: any) => {
+                  const developerName = developer.attributes?.name || developer.name || 'Unknown Developer';
+                  return (
+                    <option key={developer.id} value={developerName}>
+                      {developerName}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <Input
+                id="developer"
+                name="developer"
+                value={form.developer}
+                onChange={handleChange}
+                required
+                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Enter developer name"
+              />
+            )}
+            {developers.length > 0 && developers[0]?.id === 'manual' && (
+              <p className="text-xs text-amber-600">
+                Developer list unavailable. Please enter the developer name manually.
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="property_type" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="type" className="text-sm font-medium text-gray-700">
               Property Type
               <span className="text-red-500">*</span>
             </Label>
             <select
-              id="property_type"
-              name="property_type"
-              value={form.property_type}
+              id="type"
+              name="type"
+              value={form.type}
               onChange={handleChange}
               required
               className="h-11 w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
@@ -660,19 +1024,7 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
             </select>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-medium text-gray-700">
-              Project Title
-            </Label>
-            <Input 
-              id="title" 
-              name="title" 
-              value={form.title} 
-              onChange={handleChange} 
-              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              placeholder="Enter project title"
-            />
-          </div>
+          
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -706,30 +1058,7 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
         </div>
       </div>
 
-      {/* Description Section */}
-      <div className="space-y-6">
-        <div className="pb-2 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-            <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-blue-600" />
-            <span>Project Description</span>
-          </h3>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-            Description
-          </Label>
-          <textarea
-            id="description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            rows={4}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500 focus:outline-none resize-none"
-            placeholder="Enter detailed project description..."
-          />
-        </div>
-      </div>
+      {/* Description Section moved to Step 1; hidden in Step 2 */}
 
       {/* Facilities Section */}
       <div className="space-y-6">
@@ -784,9 +1113,9 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium text-gray-700 mb-2">Selected Facilities ({facilities.length}):</p>
               <div className="flex flex-wrap gap-2">
-                {facilities.map((facility) => (
+                {facilities.map((facility, index) => (
                   <span
-                    key={facility}
+                    key={`${facility}-${index}`}
                     className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                   >
                     {facility}
@@ -850,28 +1179,65 @@ export default function ProjectForm({ initialData, projectId, onSuccess, onCance
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onCancel}
-          className="h-11 px-6 border-gray-300 text-gray-700 hover:bg-gray-50"
-        >
-          <FontAwesomeIcon icon={faTimes} className="w-4 h-4 mr-2" />
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={loading}
-          className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <FontAwesomeIcon icon={faSave} className="w-4 h-4 mr-2" />
-          {uploading ? "Uploading Images..." : 
-           loading ? "Saving..." : 
-           (initialData ? "Update Project" : "Create Project")}
-        </Button>
+      <div className="flex items-center justify-between space-x-4 pt-6 border-t border-gray-200">
+        <div>
+          {step === 2 && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setStep(1)}
+              className="h-11 px-6 border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Back
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            className="h-11 px-6 border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            <FontAwesomeIcon icon={faTimes} className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+
+          {step === 1 ? (
+            <>
+              <Button 
+                type="button" 
+                onClick={handleSubmitOverview}
+                disabled={savingOverview}
+                className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {savingOverview ? 'Saving Overview...' : 'Save Overview'}
+              </Button>
+              <Button 
+                type="button" 
+                onClick={() => setStep(2)}
+                className="h-11 px-6 bg-gray-800 hover:bg-gray-900 text-white"
+              >
+                Next
+              </Button>
+            </>
+          ) : (
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <FontAwesomeIcon icon={faSave} className="w-4 h-4 mr-2" />
+              {uploading ? "Uploading Images..." : 
+               loading ? "Saving..." : 
+               (initialData ? "Update Project" : "Create Project")}
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );
