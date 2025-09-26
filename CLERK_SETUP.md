@@ -86,3 +86,4 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
 ### Support:
 - Clerk Documentation: [https://clerk.com/docs](https://clerk.com/docs)
 - Clerk Discord: [https://discord.gg/clerk](https://discord.gg/clerk)
+

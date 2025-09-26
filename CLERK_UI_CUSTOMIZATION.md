@@ -281,3 +281,4 @@ import { clerkTheme } from '@/lib/clerk-theme';
 - [Clerk Appearance Documentation](https://clerk.com/docs/customization/appearance)
 - [Clerk Custom Components Guide](https://clerk.com/docs/customization/custom-components)
 - [Clerk Theme Variables](https://clerk.com/docs/customization/appearance#variables)
+

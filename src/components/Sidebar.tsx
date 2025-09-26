@@ -3,11 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { FaTachometerAlt, FaFolder, FaNewspaper } from "react-icons/fa";
+import { FaTachometerAlt, FaFolder, FaNewspaper, FaCalendarAlt, FaBuilding } from "react-icons/fa";
 
 const menuItems = [
   { name: "Dashboard", href: "/", icon: <FaTachometerAlt className="text-xl" /> },
   { name: "Projects", href: "/projects", icon: <FaFolder className="text-xl" /> },
+  { name: "Events", href: "/events", icon: <FaCalendarAlt className="text-xl" /> },
+  { name: "Prop Tech", href: "/prop-tech", icon: <FaBuilding className="text-xl" /> },
   { name: "Press", href: "/press", icon: <FaNewspaper className="text-xl" /> },
 ];
 
