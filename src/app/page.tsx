@@ -14,7 +14,9 @@ import {
   faArrowDown,
   faEye,
   faEdit,
-  faPlus
+  faPlus,
+  faCog,
+  faArrowRight
 } from "@fortawesome/free-solid-svg-icons";
 import { ProjectImage } from "@/lib/imageUtils";
 import { getDeveloperName } from "@/lib/developerUtils";
@@ -56,6 +58,27 @@ interface DashboardStats {
   };
 }
 
+interface NewLaunch {
+  id: number;
+  title: string;
+  summary?: string;
+  image?: string;
+  location: string;
+  district: string;
+  status: string;
+  visibility?: string;
+  type?: string;
+  bedrooms?: string;
+  price?: string;
+  url?: string;
+  launchDate?: string;
+  developer?: string;
+  units?: number;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -64,6 +87,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [trends, setTrends] = useState<{ projectsPct: number; valuePct: number; avgPct: number }>({ projectsPct: 0, valuePct: 0, avgPct: 0 });
+  const [newLaunches, setNewLaunches] = useState<NewLaunch[]>([]);
+  const [launchesLoading, setLaunchesLoading] = useState(true);
 
   const fetchProjects = async () => {
     try {
@@ -202,8 +227,22 @@ export default function Dashboard() {
     return { projectsPct, valuePct, avgPct };
   };
 
+  const fetchNewLaunches = async () => {
+    try {
+      const response = await fetch("/api/new-launch-collection?page=1&limit=3", { cache: 'no-store' });
+      if (!response.ok) throw new Error("Failed to fetch new launches");
+      const data = await response.json();
+      setNewLaunches(data.launches || []);
+      setLaunchesLoading(false);
+    } catch (err: any) {
+      console.error("Error fetching new launches:", err);
+      setLaunchesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchNewLaunches();
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -333,189 +372,116 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* New Launch Collection Card */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">New Launch Collection</h2>
+            <button
+              onClick={() => router.push('/new-launch-collection')}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center space-x-1"
+            >
+              <span>View All</span>
+              <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
+            </button>
+          </div>
+          {launchesLoading ? (
+            <div className="text-center py-8">
+              <LoadingSpinner message="Loading new launches..." />
+            </div>
+          ) : newLaunches.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {newLaunches.slice(0, 3).map((launch) => (
+                <div
+                  key={launch.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/new-launch-collection/${launch.id}/edit`)}
+                >
+                  <div className="flex items-start space-x-3">
+                    {launch.image && (
+                      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={launch.image}
+                          alt={launch.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">{launch.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{launch.location}</p>
+                      {launch.district && (
+                        <p className="text-xs text-gray-500 mt-1">{launch.district}</p>
+                      )}
+                      <div className="flex items-center space-x-2 mt-2">
+                        {launch.status && (
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            launch.status.toLowerCase().includes('coming') || launch.status.toLowerCase().includes('preview')
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : launch.status.toLowerCase().includes('ongoing')
+                              ? 'bg-green-100 text-green-800'
+                              : launch.status.toLowerCase().includes('completed')
+                              ? 'bg-gray-100 text-gray-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {launch.status}
+                          </span>
+                        )}
+                        {launch.price && (
+                          <span className="text-xs font-medium text-gray-700">{launch.price}</span>
+                        )}
+                      </div>
+                      {launch.launchDate && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          <FontAwesomeIcon icon={faCalendarAlt} className="w-3 h-3 mr-1" />
+                          {launch.launchDate}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No new launches available</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* PropTech CTA Card */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div 
+          onClick={() => router.push('/prop-tech')}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-8 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+        >
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="flex items-center space-x-6 mb-4 md:mb-0">
+              <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
+                <FontAwesomeIcon icon={faCog} className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">PropTech Tools</h2>
+                <p className="text-blue-100 text-lg">
+                  Access powerful property technology calculators and tools to enhance your real estate operations
+                </p>
+              </div>
+            </div>
+            <button className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center space-x-2 shadow-lg">
+              <span>Explore PropTech</span>
+              <FontAwesomeIcon icon={faArrowRight} className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {stats && (
           <>
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <button
-                onClick={() => router.push('/projects?src=total-projects')}
-                className="bg-white rounded-lg shadow p-6 text-left hover:shadow-md transition"
-                title="Total number of projects in your portfolio"
-              >
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-                    <FontAwesomeIcon icon={faBuilding} className="w-6 h-6" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                    <div className="flex items-center space-x-2">
-                      <p className="text-md font-bold text-gray-900">{stats.totalProjects}</p>
-                      <span className={`${trends.projectsPct >= 0 ? 'text-green-600' : 'text-red-600'} text-xs font-medium flex items-center`}>
-                        <FontAwesomeIcon icon={trends.projectsPct >= 0 ? faArrowUp : faArrowDown} className="w-3 h-3 mr-1" />
-                        {Math.abs(trends.projectsPct).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push('/projects?src=total-value')}
-                className="bg-white rounded-lg shadow p-6 text-left hover:shadow-md transition"
-                title="Sum of listed prices across all projects"
-              >
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-green-100 text-green-600">
-                    <FontAwesomeIcon icon={faDollarSign} className="w-6 h-6" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Portfolio Value</p>
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-bold text-gray-900">{formatCurrency(stats.totalValue)}</p>
-                      <span className={`${trends.valuePct >= 0 ? 'text-green-600' : 'text-red-600'} text-xs font-medium flex items-center`}>
-                        <FontAwesomeIcon icon={trends.valuePct >= 0 ? faArrowUp : faArrowDown} className="w-3 h-3 mr-1" />
-                        {Math.abs(trends.valuePct).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push('/projects?src=average-price')}
-                className="bg-white rounded-lg shadow p-6 text-left hover:shadow-md transition"
-                title="Average price across all projects"
-              >
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <FontAwesomeIcon icon={faChartLine} className="w-6 h-6" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Average Price</p>
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-bold text-gray-900">{formatCurrency(stats.averagePrice)}</p>
-                      <span className={`${trends.avgPct >= 0 ? 'text-green-600' : 'text-red-600'} text-xs font-medium flex items-center`}>
-                        <FontAwesomeIcon icon={trends.avgPct >= 0 ? faArrowUp : faArrowDown} className="w-3 h-3 mr-1" />
-                        {Math.abs(trends.avgPct).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push('/projects?src=property-types')}
-                className="bg-white rounded-lg shadow p-6 text-left hover:shadow-md transition"
-                title="Count of distinct property types represented"
-              >
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-orange-100 text-orange-600">
-                    <FontAwesomeIcon icon={faHome} className="w-6 h-6" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Property Types</p>
-                    <p className="text-md font-bold text-gray-900">{Object.keys(stats.propertyTypes).length}</p>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            {/* Charts and Analytics */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Property Types Distribution */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Types Distribution</h3>
-                <div className="space-y-3">
-                  {stats.propertyTypes && Object.keys(stats.propertyTypes).length > 0 ? (
-                    Object.entries(stats.propertyTypes).map(([type, count]) => (
-                      <div key={type} className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{type}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-32 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${(count / stats.totalProjects) * 100}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-gray-600 w-12 text-right">
-                            {count} ({formatPercentage(count, stats.totalProjects)}%)
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No property types data available</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Price Range Distribution */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Range Distribution</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Under $500K</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-600 h-2 rounded-full" 
-                          style={{ width: `${(stats.priceRange.under500k / stats.totalProjects) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">
-                        {stats.priceRange.under500k}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">$500K - $1M</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-yellow-600 h-2 rounded-full" 
-                          style={{ width: `${(stats.priceRange.under1m / stats.totalProjects) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">
-                        {stats.priceRange.under1m}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">$1M - $2M</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-orange-600 h-2 rounded-full" 
-                          style={{ width: `${(stats.priceRange.under2m / stats.totalProjects) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">
-                        {stats.priceRange.under2m}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Over $2M</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-red-600 h-2 rounded-full" 
-                          style={{ width: `${(stats.priceRange.over2m / stats.totalProjects) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">
-                        {stats.priceRange.over2m}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Top Developers and Recent Projects */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Top Developers */}
