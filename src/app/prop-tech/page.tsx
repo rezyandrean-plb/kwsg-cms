@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEdit, faTrash, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { faEdit, faTrash, faChevronLeft, faChevronRight, faPlus } from "@fortawesome/free-solid-svg-icons";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface PropTech {
   id: number;
@@ -456,6 +457,13 @@ export default function PropTechPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
+  // UI state (align with New Launch Collection)
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("All");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: number; name: string } | null>(null);
 
   const fetchPropTech = (page: number = currentPage) => {
     setLoading(true);
@@ -490,41 +498,67 @@ export default function PropTechPage() {
   const totalItems = paginationMeta?.total || 0;
   const indexOfFirstItem = ((currentPage - 1) * itemsPerPage) + 1;
   const indexOfLastItem = Math.min(currentPage * itemsPerPage, totalItems);
-  const currentPropTech = propTech; // Prop tech are already filtered by server
+  const currentPropTech = propTech; // base list
+
+  // Derived filters
+  const allCategories = [
+    "All",
+    ...Array.from(new Set((propTech || []).map(p => p.category))).filter(Boolean) as string[],
+  ];
+
+  const filtered = currentPropTech.filter(item => {
+    const q = searchQuery.trim().toLowerCase();
+    const searchOk =
+      q.length === 0 ||
+      [item.name, item.description, item.category]
+        .filter(Boolean)
+        .some(v => (v as string).toLowerCase().includes(q));
+
+    const categoryOk = categoryFilter === "All" || item.category === categoryFilter;
+    return searchOk && categoryOk;
+  });
 
   const handleEdit = (propTechItem: PropTech) => {
     router.push(`/prop-tech/${propTechItem.id}/edit`);
   };
 
   const handleDelete = (id: number) => {
-    // Show confirmation dialog
-    if (window.confirm("Are you sure you want to delete this Prop Tech item?")) {
-      // Check if it's a mock prop tech (can't delete) or stored prop tech
-      const mockPropTechIndex = mockPropTech.findIndex(item => item.id === id);
-      const storedPropTech = JSON.parse(localStorage.getItem('mockPropTech') || '[]');
-      const storedPropTechIndex = storedPropTech.findIndex((item: PropTech) => item.id === id);
-      
-      if (mockPropTechIndex !== -1) {
-        toast.error('Cannot delete mock Prop Tech items');
-        return;
-      }
-      
-      if (storedPropTechIndex !== -1) {
-        storedPropTech.splice(storedPropTechIndex, 1);
-        localStorage.setItem('mockPropTech', JSON.stringify(storedPropTech));
-        toast.success('Prop Tech item deleted successfully');
-        // Refresh the current page
-        fetchPropTech(currentPage);
-        // If current page becomes empty and it's not the first page, go to previous page
-        if (propTech.length === 1 && currentPage > 1) {
-          const newPage = currentPage - 1;
-          setCurrentPage(newPage);
-          fetchPropTech(newPage);
-        }
-      } else {
-        toast.error('Prop Tech item not found');
-      }
+    const item = propTech.find(p => p.id === id);
+    if (item) {
+      setItemToDelete({ id, name: item.name });
+      setShowDeleteDialog(true);
     }
+  };
+
+  const confirmDelete = () => {
+    if (!itemToDelete) return;
+    const id = itemToDelete.id;
+    const mockPropTechIndex = mockPropTech.findIndex(item => item.id === id);
+    const storedPropTech = JSON.parse(localStorage.getItem('mockPropTech') || '[]');
+    const storedPropTechIndex = storedPropTech.findIndex((item: PropTech) => item.id === id);
+
+    if (mockPropTechIndex !== -1) {
+      toast.error('Cannot delete mock Prop Tech items');
+    } else if (storedPropTechIndex !== -1) {
+      storedPropTech.splice(storedPropTechIndex, 1);
+      localStorage.setItem('mockPropTech', JSON.stringify(storedPropTech));
+      toast.success('Prop Tech item deleted successfully');
+      fetchPropTech(currentPage);
+      if (propTech.length === 1 && currentPage > 1) {
+        const newPage = currentPage - 1;
+        setCurrentPage(newPage);
+        fetchPropTech(newPage);
+      }
+    } else {
+      toast.error('Prop Tech item not found');
+    }
+    setShowDeleteDialog(false);
+    setItemToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteDialog(false);
+    setItemToDelete(null);
   };
 
   const handleAddPropTech = () => {
@@ -563,24 +597,64 @@ export default function PropTechPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Prop Tech</h1>
-        <button 
-          onClick={handleAddPropTech}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-        >
-          <span>➕</span>
-          <span>Add Prop Tech</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`px-3 py-2 border rounded ${showFilters ? "bg-blue-600 text-white border-blue-600" : "hover:bg-gray-50"}`}
+            title="Toggle filters"
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`px-3 py-2 border rounded ${viewMode === "grid" ? "bg-gray-900 text-white border-gray-900" : "hover:bg-gray-50"}`}
+            title="Grid view"
+          >
+            Grid
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-2 border rounded ${viewMode === "list" ? "bg-gray-900 text-white border-gray-900" : "hover:bg-gray-50"}`}
+            title="List view"
+          >
+            List
+          </button>
+        </div>
       </div>
+
+      {showFilters && (
+        <div className="bg-white border rounded-lg p-4 mb-6">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex-1 min-w-[200px]">
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by name, description, category..."
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="border rounded px-3 py-2"
+              title="Category"
+            >
+              {allCategories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
       {loading && <div>Loading...</div>}
       {error && <div className="text-red-500">{error}</div>}
-      {!loading && !error && (
+      {!loading && !error && viewMode === "list" && (
         <>
           <table className="min-w-full border bg-white rounded shadow">
             <thead>
               <tr className="bg-gray-100">
                 <th className="px-4 py-2 text-left">Icon/Logo</th>
                 <th className="px-4 py-2 text-left">Name</th>
-                <th className="px-4 py-2 text-left">Description</th>
                 <th className="px-4 py-2 text-left">Category</th>
                 <th className="px-4 py-2 text-left">URL</th>
                 <th className="px-4 py-2 text-left">Active</th>
@@ -588,14 +662,14 @@ export default function PropTechPage() {
               </tr>
             </thead>
             <tbody>
-              {currentPropTech.length === 0 ? (
+                {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-4 text-center text-gray-500">
                     No Prop Tech items found.
                   </td>
                 </tr>
               ) : (
-                currentPropTech.map((item) => (
+                filtered.map((item) => (
                   <tr key={item.id} className="border-t">
                     <td className="px-4 py-2">
                       {item.icon ? (
@@ -609,9 +683,6 @@ export default function PropTechPage() {
                       )}
                     </td>
                     <td className="px-4 py-2 font-medium">{item.name}</td>
-                    <td className="px-4 py-2 text-gray-600" title={item.description}>
-                      {truncateText(item.description)}
-                    </td>
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {item.category}
@@ -811,6 +882,85 @@ export default function PropTechPage() {
           )}
         </>
       )}
+
+      {/* Grid view */}
+      {!loading && !error && viewMode === "grid" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.length === 0 ? (
+            <div className="col-span-full text-center text-gray-500 py-12">No Prop Tech items found.</div>
+          ) : (
+            filtered.map(item => (
+              <div key={item.id} className="group relative bg-white border rounded-lg overflow-hidden shadow hover:shadow-md transition-shadow">
+                <div className="h-40 w-full overflow-hidden flex items-center justify-center bg-gray-50">
+                  {item.icon ? (
+                    <img src={item.icon} alt={item.name} className="h-20 w-20 object-contain" />
+                  ) : (
+                    <ImagePlaceholder size="lg" />
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h3 className="font-semibold leading-tight">{item.name}</h3>
+                      <div className="text-sm text-gray-600">{item.category}</div>
+                    </div>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] ${item.active ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{item.active ? 'Active' : 'Inactive'}</span>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-700">{truncateText(item.description, 80)}</div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
+                  <div className="bg-white/95 backdrop-blur border rounded-md shadow-lg px-4 py-3 text-xs w-[85%] max-w-sm">
+                    <div className="text-center font-semibold text-gray-900 truncate">{item.name}</div>
+                    <div className="mt-3 flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="inline-flex items-center gap-1 px-3 h-8 rounded-full border text-blue-600 hover:bg-blue-50"
+                        title="Edit"
+                        aria-label="Edit"
+                      >
+                        <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
+                        <span className="text-[12px]">Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="inline-flex items-center gap-1 px-3 h-8 rounded-full border text-red-600 hover:bg-red-50"
+                        title="Delete"
+                        aria-label="Delete"
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                        <span className="text-[12px]">Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Floating Add Prop Tech */}
+      <button
+        onClick={handleAddPropTech}
+        className="fixed bottom-6 right-6 inline-flex items-center gap-2 px-5 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 text-white shadow-lg hover:shadow-xl transition-transform duration-200 hover:scale-105 active:scale-100 focus:outline-none focus:ring-4 focus:ring-blue-300"
+        aria-label="Add Prop Tech"
+        title="Add Prop Tech"
+      >
+        <FontAwesomeIcon icon={faPlus} className="w-5 h-5" />
+        <span className="text-sm font-medium">New Prop Tech</span>
+      </button>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        title="Delete Prop Tech Item"
+        message={`Are you sure you want to delete "${itemToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        variant="danger"
+      />
     </div>
   );
 }
