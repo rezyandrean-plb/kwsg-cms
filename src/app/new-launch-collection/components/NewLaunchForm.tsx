@@ -49,6 +49,37 @@ const defaultValues: NewLaunchFormValues = {
   views: "",
 };
 
+const DISTRICT_OPTIONS = [
+  "District 1 - Marina Bay, Raffles Place, Cecil",
+  "District 2 - Chinatown, Tanjong Pagar",
+  "District 3 - Queenstown, Tiong Bahru",
+  "District 4 - Telok Blangah, Harbourfront",
+  "District 5 - Pasir Panjang, West Coast, Clementi New Town",
+  "District 6 - City Hall, Clarke Quay",
+  "District 7 - Beach Road, Bugis, Rochor",
+  "District 8 - Farrer Park, Serangoon Road",
+  "District 9 - Orchard, Cairnhill, River Valley",
+  "District 10 - Tanglin, Holland, Bukit Timah",
+  "District 11 - Novena, Thomson, Newton",
+  "District 12 - Balestier, Toa Payoh, Serangoon",
+  "District 13 - Macpherson, Braddell",
+  "District 14 - Geylang, Paya Lebar, Eunos",
+  "District 15 - Katong, Joo Chiat, Amber Road",
+  "District 16 - Bedok, Upper East Coast",
+  "District 17 - Loyang, Changi",
+  "District 18 - Tampines, Pasir Ris",
+  "District 19 - Serangoon Garden, Hougang, Punggol",
+  "District 20 - Bishan, Ang Mo Kio",
+  "District 21 - Upper Bukit Timah, Clementi Park",
+  "District 22 - Jurong",
+  "District 23 - Hillview, Dairy Farm, Bukit Panjang, Choa Chu Kang",
+  "District 24 - Lim Chu Kang, Tengah",
+  "District 25 - Woodlands, Kranji",
+  "District 26 - Upper Thomson, Springleaf",
+  "District 27 - Yishun, Sembawang",
+  "District 28 - Seletar",
+];
+
 export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<NewLaunchFormValues>({ ...defaultValues, ...initialValues });
@@ -68,7 +99,12 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
   const canSubmit = useMemo(() => {
     return (
       values.title.trim().length > 0 &&
+      values.summary.trim().length > 0 &&
+      values.image.trim().length > 0 &&
       values.location.trim().length > 0 &&
+      values.district.trim().length > 0 &&
+      values.bedrooms.trim().length > 0 &&
+      values.price.trim().length > 0 &&
       values.status.trim().length > 0 &&
       values.visibility.trim().length > 0 &&
       values.type.trim().length > 0
@@ -238,18 +274,19 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Summary</label>
+          <label className="block text-sm font-medium text-gray-700">Summary *</label>
           <textarea
             value={values.summary}
             onChange={e => handleChange("summary", e.target.value)}
             className="mt-1 w-full border rounded px-3 py-2"
             rows={3}
             placeholder="Short description"
+            required
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Thumbnail *</label>
           
           {values.image ? (
             <div className="space-y-4">
@@ -402,13 +439,18 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">District</label>
-          <input
+          <label className="block text-sm font-medium text-gray-700">District *</label>
+          <select
             value={values.district}
             onChange={e => handleChange("district", e.target.value)}
             className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="District number/name"
-          />
+            required
+          >
+            <option value="">Select district</option>
+            {DISTRICT_OPTIONS.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -463,23 +505,28 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Bedrooms</label>
+          <label className="block text-sm font-medium text-gray-700">Bedrooms Total *</label>
           <input
             value={values.bedrooms}
             onChange={e => handleChange("bedrooms", e.target.value)}
             className="mt-1 w-full border rounded px-3 py-2"
             placeholder="e.g. 1-4, 3-5, 2-5"
+            required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Price</label>
+          <label className="block text-sm font-medium text-gray-700">Starting Price *</label>
           <input
             value={values.price}
             onChange={e => handleChange("price", e.target.value)}
             className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="From $1,495,000"
+            placeholder="$1,495,000"
+            required
           />
+          <p className="mt-1 text-xs text-gray-500">
+            Enter only the numeric price (Example: 1,000,000).
+          </p>
         </div>
 
         <div>

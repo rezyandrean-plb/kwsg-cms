@@ -34,3 +34,19 @@ model NewLaunch {
   @@map("new_launch_collection")
   @@schema("public")
 }
+
+model ToolResource {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  icon        String?
+  category    String
+  subCategory String?
+  url         String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tool_resource")
+  @@schema("public")
+}

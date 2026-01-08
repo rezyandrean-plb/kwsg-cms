@@ -552,7 +552,7 @@ export default function NewLaunchCollectionPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2">{item.bedrooms}</td>
-                      <td className="px-4 py-2 font-medium text-green-600">{item.price}</td>
+                      <td className="px-4 py-2 font-medium text-green-600">From ${item.price}</td>
                       <td className="px-4 py-2">
                         <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -586,12 +586,12 @@ export default function NewLaunchCollectionPage() {
                 <div className="col-span-full text-center text-gray-500 py-12">No New Launch items found.</div>
               ) : (
                 filteredAndSorted.map(item => (
-                  <div key={item.id} className="group relative bg-white border rounded-lg overflow-hidden shadow hover:shadow-md transition-shadow">
-                    <div className="h-40 w-full overflow-hidden">
+                <div key={item.id} className="group relative bg-white border rounded-lg overflow-hidden shadow hover:shadow-md transition-shadow flex flex-col min-h-[360px]">
+                  <div className="h-40 w-full overflow-hidden flex-shrink-0">
                       {item.image ? (
                         <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
                           <ImagePlaceholder size="lg" />
                         </div>
                       )}
@@ -601,11 +601,13 @@ export default function NewLaunchCollectionPage() {
                         <span key={b} className="text-[10px] px-2 py-0.5 rounded-full bg-black/70 text-white">{b}</span>
                       ))}
                     </div>
-                    <div className="p-4">
+                    <div className="p-4 flex-1 flex flex-col">
                       <div className="flex justify-between items-start gap-2">
-                        <div>
+                        <div className="min-h-[60px]">
                           <h3 className="font-semibold leading-tight">{item.title}</h3>
-                          <div className="text-sm text-gray-600">{item.location} • {item.district}</div>
+                          <div className="text-sm text-gray-600 min-h-[22px]">
+                            {item.location} • {item.district}
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] ${getStatusColor(item.status)}`}>{item.status}</span>
@@ -616,8 +618,8 @@ export default function NewLaunchCollectionPage() {
                           }`}>{item.visibility || 'Show'}</span>
                         </div>
                       </div>
-                      <div className="mt-2 text-green-700 font-medium">{item.price}</div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+                      <div className="mt-2 text-green-700 font-medium">From ${item.price}</div>
+                      <div className="mt-3 flex items-center justify-between text-xs text-gray-600 min-h-[20px]">
                         <div>Type: {item.type}</div>
                         <div>Units: {item.units ?? 200}</div>
                         <div>BR: {item.bedrooms}</div>

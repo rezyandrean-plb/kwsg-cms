@@ -1,21 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import CustomImageUpload from "@/components/CustomImageUpload";
-
-interface PropTech {
-  id: number;
-  name: string;
-  description: string;
-  icon?: string;
-  category: string;
-  url?: string;
-  active: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUpload, faTrash, faEye, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { uploadFileToS3, validateImageFile } from "@/lib/uploadUtils";
 
 export default function EditPropTechPage() {
   const router = useRouter();
@@ -24,46 +14,40 @@ export default function EditPropTechPage() {
   
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [showUploadArea, setShowUploadArea] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     url: "",
     category: "",
     active: true,
+    icon: "",
   });
-
-  // Image state for CustomImageUpload
-  const [currentImages, setCurrentImages] = useState<string[]>([]);
-  const [newImages, setNewImages] = useState<File[]>([]);
 
   useEffect(() => {
     const fetchPropTech = async () => {
       try {
-        // Simulate API call with mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await fetch(`/api/tool-resources/${propTechId}`);
         
-        // Get prop tech from localStorage (in real app, this would be from API)
-        const storedPropTech = JSON.parse(localStorage.getItem('mockPropTech') || '[]');
-        const propTechItem = storedPropTech.find((item: PropTech) => item.id === parseInt(propTechId));
-        
-        if (!propTechItem) {
-          toast.error('Prop Tech item not found');
-          router.push('/prop-tech');
-          return;
+        if (!response.ok) {
+          throw new Error('Failed to fetch tool resource');
         }
+        
+        const data = await response.json();
         
         setFormData({
-          name: propTechItem.name || "",
-          description: propTechItem.description || "",
-          url: propTechItem.url || "",
-          category: propTechItem.category || "",
-          active: propTechItem.active !== undefined ? propTechItem.active : true,
+          name: data.name || "",
+          description: data.description || "",
+          url: data.url || "",
+          category: data.category || "",
+          active: data.active !== undefined ? data.active : true,
+          icon: data.icon || "",
         });
-        
-        // Set current images from the prop tech item
-        if (propTechItem.icon) {
-          setCurrentImages([propTechItem.icon]);
-        }
       } catch (error) {
         console.error('Error fetching Prop Tech item:', error);
         toast.error('Failed to fetch Prop Tech item');
@@ -86,54 +70,104 @@ export default function EditPropTechPage() {
     }));
   };
 
-  // Handle image file selection
-  const handleImageChange = (files: File[]) => {
-    setNewImages(prev => [...prev, ...files]);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
   };
 
-  // Remove current image
-  const removeCurrentImage = (index: number) => {
-    setCurrentImages(prev => prev.filter((_, i) => i !== index));
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
   };
 
-  // Remove new image
-  const removeNewImage = (index: number) => {
-    setNewImages(prev => prev.filter((_, i) => i !== index));
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+    
+    if (!imageFile) {
+      toast.error("Please drop an image file");
+      return;
+    }
+
+    await handleFileUpload(imageFile);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFile = files[0];
+    
+    if (imageFile) {
+      await handleFileUpload(imageFile);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid file");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const result = await uploadFileToS3(file, 'images/tech-tools');
+      
+      if (result.success && result.url) {
+        setFormData(prev => ({ ...prev, icon: result.url! }));
+        setShowUploadArea(false);
+        toast.success("Image uploaded successfully!");
+      } else {
+        toast.error(result.error || "Failed to upload image");
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, icon: "" }));
+    setShowUploadArea(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.name.trim() || !formData.description.trim() || !formData.category.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Simulate API call with mock data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update prop tech in localStorage (in real app, this would be sent to API)
-      const storedPropTech = JSON.parse(localStorage.getItem('mockPropTech') || '[]');
-      const propTechIndex = storedPropTech.findIndex((item: PropTech) => item.id === parseInt(propTechId));
-      
-      if (propTechIndex !== -1) {
-        // Convert new images to URLs (in real app, these would be uploaded to server)
-        const newImageUrls = newImages.map(file => URL.createObjectURL(file));
-        const allImageUrls = [...currentImages, ...newImageUrls];
-        
-        storedPropTech[propTechIndex] = {
-          ...storedPropTech[propTechIndex],
-          name: formData.name,
-          description: formData.description,
-          url: formData.url,
-          category: formData.category,
-          active: formData.active,
-          icon: allImageUrls[0] || undefined, // Use first image as icon
-          updated_at: new Date().toISOString()
-        };
-        localStorage.setItem('mockPropTech', JSON.stringify(storedPropTech));
-        toast.success('Prop Tech item updated successfully');
-        router.push('/prop-tech');
-      } else {
-        toast.error('Prop Tech item not found');
+      const payload = {
+        name: formData.name,
+        description: formData.description,
+        url: formData.url || undefined,
+        category: formData.category,
+        active: formData.active,
+        icon: formData.icon || undefined,
+      };
+
+      const response = await fetch(`/api/tool-resources/${propTechId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update tool resource');
       }
+
+      toast.success('Prop Tech item updated successfully');
+      router.push('/prop-tech');
     } catch (error) {
       console.error('Error updating Prop Tech item:', error);
       toast.error('Failed to update Prop Tech item');
@@ -229,13 +263,10 @@ export default function EditPropTechPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select a category</option>
-              <option value="Internal Tool">Internal Tool</option>
-              <option value="Command Tools">Command Tools</option>
+              <option value="Business Tool">Business Tool</option>
+              <option value="Learnings">Learnings</option>
               <option value="External Tools">External Tools</option>
               <option value="Compass Tools">Compass Tools</option>
-              <option value="Research Tools">Research Tools</option>
-              <option value="Training Resource">Training Resource</option>
-              <option value="Other">Other</option>
             </select>
           </div>
 
@@ -256,17 +287,113 @@ export default function EditPropTechPage() {
             </div>
           </div>
 
-          {/* Custom Image Upload */}
+          {/* Image Upload */}
           <div className="md:col-span-2">
-            <CustomImageUpload
-              currentImages={currentImages}
-              newImages={newImages}
-              onImageChange={handleImageChange}
-              onRemoveCurrentImage={removeCurrentImage}
-              onRemoveNewImage={removeNewImage}
-              label="Icon/Logo Image"
-              maxFiles={1}
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Icon/Logo Image</label>
+            
+            {formData.icon ? (
+              <div className="space-y-4">
+                <div className="relative group">
+                  <img
+                    src={formData.icon}
+                    alt="Preview"
+                    className="w-full h-64 object-cover rounded-lg border border-gray-200 cursor-pointer bg-gray-100"
+                    onClick={() => setShowLightbox(true)}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLightbox(true)}
+                      className="bg-white text-gray-700 p-2 rounded-full hover:bg-gray-100 shadow-lg"
+                      title="View image"
+                    >
+                      <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg"
+                      title="Remove image"
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadArea(!showUploadArea)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                    disabled={isUploading}
+                  >
+                    {showUploadArea ? "Cancel" : "Change image"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {(!formData.icon || showUploadArea) && (
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+                {isUploading ? (
+                  <div className="text-gray-600">Uploading...</div>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faUpload} className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">
+                      Drag and drop an image here, or click to select
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      Browse files
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {showLightbox && formData.icon && (
+              <div
+                className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+                onClick={() => setShowLightbox(false)}
+              >
+                <div className="relative max-w-4xl max-h-full p-4">
+                  <button
+                    onClick={() => setShowLightbox(false)}
+                    className="absolute top-4 right-4 text-white hover:text-gray-300"
+                  >
+                    <FontAwesomeIcon icon={faTimes} className="w-6 h-6" />
+                  </button>
+                  <img
+                    src={formData.icon}
+                    alt="Preview"
+                    className="max-w-full max-h-[90vh] object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
