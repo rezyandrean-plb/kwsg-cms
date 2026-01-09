@@ -29,34 +29,47 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   return (
     <ProtectedRoute>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-gray-50">
         <Sidebar />
-        <div className="flex-1 flex flex-col">
-          {/* Navbar */}
-          <nav className="w-full h-16 flex items-center justify-between px-6 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70 border-b">
+        <div className="flex flex-1 flex-col lg:pl-64">
+          {/* Top Navigation Bar */}
+          <nav className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200/80 bg-white/80 px-6 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">CMS</span>
-              <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-gray-300" />
-              <span className="text-sm font-medium text-gray-700">KWSG Projects</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                Content Management
+              </span>
+              <span className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
+              <span className="hidden text-sm font-semibold text-gray-700 sm:inline-block">
+                KWSG Projects
+              </span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="hidden sm:block text-sm text-gray-600">
-                {user?.emailAddresses[0]?.emailAddress || 'Admin'}
-              </span>
+              <div className="hidden items-center gap-2 sm:flex">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-xs font-semibold text-white">
+                  {user?.emailAddresses[0]?.emailAddress?.charAt(0).toUpperCase() || 'A'}
+                </div>
+                <span className="text-sm text-gray-700">
+                  {user?.emailAddresses[0]?.emailAddress || 'Admin'}
+                </span>
+              </div>
               <SignOutButton>
                 <button 
-                  className="inline-flex items-center gap-2 px-3 h-10 rounded-lg text-gray-700 hover:text-blue-700 hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  title="Logout"
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  title="Sign out"
                 >
-                  <FontAwesomeIcon icon={faSignOutAlt} className="text-lg" />
-                  <span className="hidden sm:inline text-sm font-medium">Sign out</span>
+                  <FontAwesomeIcon icon={faSignOutAlt} className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign out</span>
                 </button>
               </SignOutButton>
             </div>
           </nav>
-          <main className="flex-1 p-8">{children}</main>
+          
+          {/* Main Content */}
+          <main className="flex-1 p-6 lg:p-8">
+            {children}
+          </main>
         </div>
       </div>
     </ProtectedRoute>
   );
-} 
+}

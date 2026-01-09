@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload, faTrash, faEye, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faUpload, faTrash, faEye, faTimes, faSpinner, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { uploadFileToS3, validateImageFile } from "@/lib/uploadUtils";
 
 export interface NewLaunchFormValues {
@@ -150,16 +150,12 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const imageFile = files[0];
-    
-    if (imageFile) {
-      await handleFileUpload(imageFile);
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleFileUpload(file);
   };
 
   const handleFileUpload = async (file: File) => {
-    // Validate file
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast.error(validation.error || "Invalid file");
@@ -167,31 +163,26 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
     }
 
     setIsUploading(true);
-
     try {
-      // Upload to S3 with the specified folder
-      const result = await uploadFileToS3(file, 'images/new-launch-collection');
-      
+      const result = await uploadFileToS3(file, "new-launch-collection");
       if (result.success && result.url) {
         setValues(prev => ({ ...prev, image: result.url! }));
-        setShowUploadArea(false); // Hide upload area after successful upload
-        toast.success("Image uploaded successfully!");
+        toast.success("Image uploaded successfully");
+        setShowUploadArea(false);
       } else {
-        toast.error(result.error || "Failed to upload image");
+        toast.error(result.error || "Upload failed");
       }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error("Failed to upload image");
+    } catch (error: any) {
+      toast.error(error.message || "Upload failed");
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleRemoveImage = () => {
-    setValues(prev => ({ ...prev, image: "" }));
-    setShowUploadArea(false); // Hide upload area when image is removed
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    if (window.confirm("Are you sure you want to remove this image?")) {
+      setValues(prev => ({ ...prev, image: "" }));
+      setShowUploadArea(false);
     }
   };
 
@@ -218,7 +209,6 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
       if (!res.ok) throw new Error(`Failed to ${isEdit ? "update" : "create"} new launch`);
       toast.success(`New launch ${isEdit ? "updated" : "created"} successfully`);
       router.push("/new-launch-collection");
-      // Ensure list reflects the latest data
       if (typeof (router as any).refresh === 'function') {
         (router as any).refresh();
       }
@@ -230,63 +220,87 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
   };
 
   return (
-    <form onSubmit={onSubmit} className="bg-white border rounded-lg p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{isEdit ? "Edit New Launch" : "Create New Launch"}</h1>
-        <div className="space-x-2">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-3 py-2 border rounded hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSubmit || saving}
-            className={`px-4 py-2 rounded text-white ${!canSubmit || saving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
-          >
-            {saving ? "Saving..." : isEdit ? "Save Changes" : "Create"}
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 mb-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {isEdit ? "Edit New Launch" : "Create New Launch"}
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  {isEdit ? "Update the new launch information" : "Add a new property launch to the collection"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <FontAwesomeIcon icon={faArrowLeft} className="w-4 h-4" />
+                <span>Back</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Title *</label>
-          <input
-            value={values.title}
-            onChange={e => handleChange("title", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="Project title"
-            required
-          />
+      <form onSubmit={onSubmit} className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        {/* Basic Information Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 pb-4 border-b border-gray-200">
+            Basic Information
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={values.title}
+                onChange={e => handleChange("title", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Project title"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Developer
+              </label>
+              <input
+                value={values.developer ?? ""}
+                onChange={e => handleChange("developer", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Developer name"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Summary <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={values.summary}
+                onChange={e => handleChange("summary", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                rows={4}
+                placeholder="Short description of the property launch"
+                required
+              />
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Developer</label>
-          <input
-            value={values.developer ?? ""}
-            onChange={e => handleChange("developer", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="Developer name"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Summary *</label>
-          <textarea
-            value={values.summary}
-            onChange={e => handleChange("summary", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            rows={3}
-            placeholder="Short description"
-            required
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Thumbnail *</label>
+        {/* Image Upload Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 pb-4 border-b border-gray-200">
+            Thumbnail Image <span className="text-red-500">*</span>
+          </h2>
           
           {values.image ? (
             <div className="space-y-4">
@@ -294,22 +308,22 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
                 <img
                   src={values.image}
                   alt="Preview"
-                  className="w-full h-64 object-cover rounded-lg border border-gray-200 cursor-pointer bg-gray-100"
+                  className="w-full h-64 object-cover rounded-xl border-2 border-gray-200 cursor-pointer bg-gray-100 transition-transform group-hover:scale-[1.02]"
                   onClick={() => setShowLightbox(true)}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     const errorDiv = document.createElement('div');
-                    errorDiv.className = 'w-full h-64 bg-gray-100 border border-gray-300 rounded-lg flex items-center justify-center text-gray-600 text-sm';
+                    errorDiv.className = 'w-full h-64 bg-gray-100 border-2 border-gray-300 rounded-xl flex items-center justify-center text-gray-600 text-sm';
                     errorDiv.innerHTML = 'Image not available';
                     target.parentNode?.appendChild(errorDiv);
                   }}
                 />
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
                   <button
                     type="button"
                     onClick={() => setShowLightbox(true)}
-                    className="bg-white text-gray-700 p-2 rounded-full hover:bg-gray-100 shadow-lg"
+                    className="bg-white text-gray-700 p-2.5 rounded-lg hover:bg-gray-100 shadow-lg transition-colors"
                     title="View image"
                   >
                     <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
@@ -317,41 +331,38 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
                   <button
                     type="button"
                     onClick={handleRemoveImage}
-                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg"
+                    className="bg-red-500 text-white p-2.5 rounded-lg hover:bg-red-600 shadow-lg transition-colors"
                     title="Remove image"
                   >
                     <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadArea(!showUploadArea)}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                  disabled={isUploading}
-                >
-                  {showUploadArea ? "Cancel" : "Change image"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowUploadArea(!showUploadArea)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                disabled={isUploading}
+              >
+                {showUploadArea ? "Cancel" : "Change image"}
+              </button>
 
-              {/* Upload area shown below current image when "Change image" is clicked */}
               {showUploadArea && (
                 <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
                     isDragOver
                       ? "border-blue-500 bg-blue-50"
-                      : "border-gray-300 hover:border-gray-400"
+                      : "border-gray-300 hover:border-gray-400 bg-gray-50"
                   }`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   <FontAwesomeIcon 
-                    icon={faUpload} 
-                    className="w-8 h-8 text-gray-400 mb-4" 
+                    icon={isUploading ? faSpinner : faUpload} 
+                    className={`w-10 h-10 text-gray-400 mb-4 ${isUploading ? 'animate-spin' : ''}`}
                   />
-                  <p className="text-lg font-medium text-gray-700 mb-2">
+                  <p className="text-base font-medium text-gray-700 mb-2">
                     Drop an image here or click to browse
                   </p>
                   <p className="text-sm text-gray-500 mb-4">
@@ -360,10 +371,9 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={isUploading}
                   >
-                    <FontAwesomeIcon icon={faUpload} className="w-4 h-4 mr-2" />
                     {isUploading ? 'Uploading...' : 'Choose Image'}
                   </button>
                   <input
@@ -378,32 +388,31 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
             </div>
           ) : (
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
                 isDragOver
                   ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
+                  : "border-gray-300 hover:border-gray-400 bg-gray-50"
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               <FontAwesomeIcon 
-                icon={faUpload} 
-                className="w-8 h-8 text-gray-400 mb-4" 
+                icon={isUploading ? faSpinner : faUpload} 
+                className={`w-12 h-12 text-gray-400 mb-4 ${isUploading ? 'animate-spin' : ''}`}
               />
               <p className="text-lg font-medium text-gray-700 mb-2">
                 Drop an image here or click to browse
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-gray-500 mb-6">
                 Supports JPG, PNG, GIF, WebP (max 10MB)
               </p>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isUploading}
               >
-                <FontAwesomeIcon icon={faUpload} className="w-4 h-4 mr-2" />
                 {isUploading ? 'Uploading...' : 'Choose Image'}
               </button>
               <input
@@ -417,167 +426,223 @@ export default function NewLaunchForm({ mode, initialValues, id }: NewLaunchForm
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Landing URL</label>
-          <input
-            value={values.url}
-            onChange={e => handleChange("url", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="/my-project"
-          />
-        </div>
+        {/* Property Details Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 pb-4 border-b border-gray-200">
+            Property Details
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Location <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={values.location}
+                onChange={e => handleChange("location", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Neighborhood or area"
+                required
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Location *</label>
-          <input
-            value={values.location}
-            onChange={e => handleChange("location", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="Neighborhood or area"
-            required
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                District <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={values.district}
+                onChange={e => handleChange("district", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                required
+              >
+                <option value="">Select district</option>
+                {DISTRICT_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">District *</label>
-          <select
-            value={values.district}
-            onChange={e => handleChange("district", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            required
-          >
-            <option value="">Select district</option>
-            {DISTRICT_OPTIONS.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={values.status}
+                onChange={e => handleChange("status", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                required
+              >
+                {[
+                  "Registration Open",
+                  "Preview Available",
+                  "Coming Soon",
+                  "Ongoing",
+                  "Completed",
+                  "Upcoming",
+                  "Launched",
+                  "Sold Out",
+                ].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Status *</label>
-          <select
-            value={values.status}
-            onChange={e => handleChange("status", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            required
-          >
-            {[
-              "Registration Open",
-              "Preview Available",
-              "Coming Soon",
-              "Ongoing",
-              "Completed",
-              "Upcoming",
-              "Launched",
-              "Sold Out",
-            ].map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Visibility <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={values.visibility}
+                onChange={e => handleChange("visibility", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                required
+              >
+                {["Show", "Hidden"].map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Visibility *</label>
-          <select
-            value={values.visibility}
-            onChange={e => handleChange("visibility", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            required
-          >
-            {["Show", "Hidden"].map(v => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={values.type}
+                onChange={e => handleChange("type", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                required
+              >
+                {["Condo", "Landed", "Mixed", "Executive Condo", "Other"].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Type *</label>
-          <select
-            value={values.type}
-            onChange={e => handleChange("type", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            required
-          >
-            {["Condo", "Landed", "Mixed", "Executive Condo", "Other"].map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bedrooms Total <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={values.bedrooms}
+                onChange={e => handleChange("bedrooms", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="e.g. 1-4, 3-5, 2-5"
+                required
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Bedrooms Total *</label>
-          <input
-            value={values.bedrooms}
-            onChange={e => handleChange("bedrooms", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="e.g. 1-4, 3-5, 2-5"
-            required
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Starting Price <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={values.price}
+                onChange={e => handleChange("price", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="$1,495,000"
+                required
+              />
+              <p className="mt-1.5 text-xs text-gray-500">
+                Enter only the numeric price (Example: 1,000,000)
+              </p>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Starting Price *</label>
-          <input
-            value={values.price}
-            onChange={e => handleChange("price", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="$1,495,000"
-            required
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Enter only the numeric price (Example: 1,000,000).
-          </p>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Launch Date
+              </label>
+              <input
+                value={values.launchDate ?? ""}
+                onChange={e => handleChange("launchDate", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="e.g. April 2024"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Launch Date</label>
-          <input
-            value={values.launchDate ?? ""}
-            onChange={e => handleChange("launchDate", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="e.g. April 2024"
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Units
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={values.units === "" ? "" : String(values.units)}
+                onChange={e => handleNumberChange("units", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="e.g. 200"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Units</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={values.units === "" ? "" : String(values.units)}
-            onChange={e => handleNumberChange("units", e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="e.g. 200"
-          />
-        </div>
-
-        
-      </div>
-
-      {/* Lightbox */}
-      {showLightbox && values.image && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
-          onClick={() => setShowLightbox(false)}
-        >
-          <div className="relative max-w-4xl max-h-full p-4">
-            <button
-              onClick={() => setShowLightbox(false)}
-              className="absolute top-4 right-4 bg-white text-gray-700 p-2 rounded-full hover:bg-gray-100 z-10"
-            >
-              <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
-            </button>
-            <img
-              src={values.image}
-              alt="Full size preview"
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Landing URL
+              </label>
+              <input
+                value={values.url}
+                onChange={e => handleChange("url", e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="/my-project"
+              />
+            </div>
           </div>
         </div>
-      )}
-    </form>
+
+        {/* Form Actions */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit || saving}
+              className={`px-6 py-2.5 rounded-lg text-white font-medium transition-all ${
+                !canSubmit || saving
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow-md"
+              }`}
+            >
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </span>
+              ) : (
+                isEdit ? "Save Changes" : "Create Launch"
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Lightbox */}
+        {showLightbox && values.image && (
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowLightbox(false)}
+          >
+            <div className="relative max-w-5xl max-h-full">
+              <button
+                onClick={() => setShowLightbox(false)}
+                className="absolute -top-12 right-0 bg-white text-gray-700 p-3 rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
+              >
+                <FontAwesomeIcon icon={faTimes} className="w-5 h-5" />
+              </button>
+              <img
+                src={values.image}
+                alt="Full size preview"
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }
-
-

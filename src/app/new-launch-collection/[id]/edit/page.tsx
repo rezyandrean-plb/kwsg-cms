@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import NewLaunchForm, { NewLaunchFormValues } from "../../components/NewLaunchForm";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 
 export default function EditNewLaunchPage() {
   const params = useParams();
@@ -28,6 +30,7 @@ export default function EditNewLaunchPage() {
           location: data.location ?? "",
           district: data.district ?? "",
           status: data.status ?? "Registration Open",
+          visibility: data.visibility ?? "Show",
           type: data.type ?? "Condo",
           bedrooms: data.bedrooms ?? "",
           price: data.price ?? "",
@@ -46,16 +49,43 @@ export default function EditNewLaunchPage() {
     run();
   }, [id]);
 
-  if (!id) return <div className="px-4 py-6 text-red-600">Invalid ID</div>;
-  if (loading) return <div className="px-4 py-6">Loading...</div>;
-  if (error) return <div className="px-4 py-6 text-red-600">{error}</div>;
+  if (!id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+            <p className="font-medium">Invalid ID</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <FontAwesomeIcon icon={faSpinner} className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading new launch details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg max-w-md">
+            <p className="font-medium">Error loading new launch</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!initial) return null;
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <NewLaunchForm mode="edit" id={id} initialValues={initial} />
-    </div>
-  );
+  return <NewLaunchForm mode="edit" id={id} initialValues={initial} />;
 }
-
-

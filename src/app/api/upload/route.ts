@@ -3,7 +3,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 // S3 Client configuration (server-side)
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'ap-southeast-1',
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
 
     for (const file of files) {
       // Validate file
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      const maxSize = 50 * 1024 * 1024; // 50MB (increased for PDFs)
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 
       if (file.size > maxSize) {
         uploadResults.push({
           success: false,
           fileName: file.name,
-          error: 'File size must be less than 10MB',
+          error: 'File size must be less than 50MB',
         });
         continue;
       }
@@ -52,17 +52,40 @@ export async function POST(request: NextRequest) {
         uploadResults.push({
           success: false,
           fileName: file.name,
-          error: 'Only JPG, PNG, GIF, and WebP files are allowed',
+          error: 'Only JPG, PNG, GIF, WebP, and PDF files are allowed',
         });
         continue;
       }
 
       try {
-        // Generate unique filename
-        const timestamp = Date.now();
-        const randomString = Math.random().toString(36).substring(2, 15);
+        // Generate filename with better structure for newsletters
+        let fileName: string;
         const fileExtension = file.name.split('.').pop();
-        const fileName = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
+        
+        if (folder === 'newsletter') {
+          // For newsletters, create a date-based folder structure
+          // Format: newsletter/{month-name}-{year}/{day}/filename.pdf
+          // Example: newsletter/december-2025/31/Newsletter+Dec+31.pdf
+          const now = new Date();
+          const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                             'july', 'august', 'september', 'october', 'november', 'december'];
+          const month = monthNames[now.getMonth()];
+          const year = now.getFullYear();
+          const day = now.getDate().toString();
+          
+          // Clean filename - preserve original name but replace spaces with +
+          const cleanFileName = file.name
+            .replace(/\s+/g, '+')
+            .replace(/[^a-zA-Z0-9+.-]/g, '');
+          
+          const finalFileName = cleanFileName || `Newsletter+${month.charAt(0).toUpperCase() + month.slice(1, 3)}+${day}.${fileExtension}`;
+          fileName = `${folder}/${month}-${year}/${day}/${finalFileName}`;
+        } else {
+          // For other folders, use timestamp-based naming
+          const timestamp = Date.now();
+          const randomString = Math.random().toString(36).substring(2, 15);
+          fileName = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
+        }
 
         // Convert File to Buffer
         const bytes = await file.arrayBuffer();
@@ -79,8 +102,14 @@ export async function POST(request: NextRequest) {
 
         await s3Client.send(uploadCommand);
 
-        // Generate public URL
-        const publicUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`;
+        // Generate public URL - use ap-southeast-1 for kwsingapore bucket
+        // URL-encode the filename part (everything after the last /)
+        const region = process.env.AWS_REGION || 'ap-southeast-1';
+        const lastSlashIndex = fileName.lastIndexOf('/');
+        const folderPath = fileName.substring(0, lastSlashIndex + 1);
+        const fileNameOnly = fileName.substring(lastSlashIndex + 1);
+        const encodedFileName = encodeURIComponent(fileNameOnly);
+        const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${folderPath}${encodedFileName}`;
 
         uploadResults.push({
           success: true,
