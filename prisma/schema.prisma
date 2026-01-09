@@ -41,12 +41,24 @@ model ToolResource {
   description String
   icon        String?
   category    String
-  subCategory String?
+  subCategory String? @map("sub_category")
   url         String?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@map("tool_resource")
+  @@schema("public")
+}
+
+model Newsletter {
+  id          Int      @id @default(autoincrement())
+  date        String   // Date range like "29/12/2025 – 2/1/2026"
+  url         String   // S3 URL to PDF file
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("newsletter")
   @@schema("public")
 }
