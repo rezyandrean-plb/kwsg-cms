@@ -4,59 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
-  faHome, 
-  faBuilding, 
-  faDollarSign, 
-  faChartLine, 
-  faMapMarkerAlt,
   faCalendarAlt,
-  faArrowUp,
-  faArrowDown,
   faEye,
-  faEdit,
-  faPlus,
   faCog,
-  faArrowRight
+  faArrowRight,
+  faPlus,
+  faWandSparkles,
+  faEnvelope,
+  faFilePdf
 } from "@fortawesome/free-solid-svg-icons";
-import { ProjectImage } from "@/lib/imageUtils";
-import { getDeveloperName } from "@/lib/developerUtils";
 import LoadingSpinner from "@/components/LoadingSpinner";
-
-interface Project {
-  id: number;
-  name: string;
-  type: string;
-  developer: {
-    name: string;
-    description?: string;
-    logo_url?: string;
-    website?: string;
-    contact_email?: string;
-    contact_phone?: string;
-  };
-  price: string;
-  price_from?: string;
-  location: string;
-  created_at?: string;
-  updated_at?: string;
-  image_url_banner?: string;
-  images?: ProjectImage[];
-}
-
-interface DashboardStats {
-  totalProjects: number;
-  totalValue: number;
-  averagePrice: number;
-  propertyTypes: { [key: string]: number };
-  topDevelopers: { [key: string]: number };
-  recentProjects: Project[];
-  priceRange: {
-    under500k: number;
-    under1m: number;
-    under2m: number;
-    over2m: number;
-  };
-}
 
 interface NewLaunch {
   id: number;
@@ -79,153 +36,21 @@ interface NewLaunch {
   updatedAt?: string;
 }
 
+interface Newsletter {
+  id: number;
+  date: string;
+  url: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [trends, setTrends] = useState<{ projectsPct: number; valuePct: number; avgPct: number }>({ projectsPct: 0, valuePct: 0, avgPct: 0 });
   const [newLaunches, setNewLaunches] = useState<NewLaunch[]>([]);
   const [launchesLoading, setLaunchesLoading] = useState(true);
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch("https://striking-hug-052e89dfad.strapiapp.com/api/projects/");
-      if (!response.ok) throw new Error("Failed to fetch projects");
-      const data = await response.json();
-      const projectsData = data.data || [];
-      setProjects(projectsData);
-      
-      // Calculate dashboard statistics
-      const calculatedStats = calculateStats(projectsData);
-      setStats(calculatedStats);
-      setTrends(calculateTrends(projectsData));
-      setLoading(false);
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
-  const calculateStats = (projects: Project[]): DashboardStats => {
-    const propertyTypes: { [key: string]: number } = {};
-    const developers: { [key: string]: number } = {};
-    let totalValue = 0;
-    let under500k = 0, under1m = 0, under2m = 0, over2m = 0;
-
-    // Handle empty projects array
-    if (!projects || projects.length === 0) {
-      return {
-        totalProjects: 0,
-        totalValue: 0,
-        averagePrice: 0,
-        propertyTypes: {},
-        topDevelopers: {},
-        recentProjects: [],
-        priceRange: { under500k: 0, under1m: 0, under2m: 0, over2m: 0 }
-      };
-    }
-
-    projects.forEach(project => {
-      // Count property types (handle undefined/null type)
-      if (project.type) {
-        propertyTypes[project.type] = (propertyTypes[project.type] || 0) + 1;
-      }
-      
-      // Count developers (handle undefined/null developer)
-      if (project.developer) {
-        const developerName = getDeveloperName(project.developer);
-        developers[developerName] = (developers[developerName] || 0) + 1;
-      }
-      
-      // Calculate price statistics
-      if (project.price) {
-        const price = parseFloat(project.price.replace(/[^0-9.]/g, ''));
-        if (!isNaN(price)) {
-          totalValue += price;
-          if (price < 500000) under500k++;
-          else if (price < 1000000) under1m++;
-          else if (price < 2000000) under2m++;
-          else over2m++;
-        }
-      }
-    });
-
-    // Sort developers by count
-    const topDevelopers = Object.fromEntries(
-      Object.entries(developers).sort(([,a], [,b]) => b - a).slice(0, 5)
-    );
-
-    // Get recent projects (last 5)
-    const recentProjects = projects
-      .sort((a, b) => new Date(b.updated_at || b.created_at || '').getTime() - new Date(a.updated_at || a.created_at || '').getTime())
-      .slice(0, 5);
-
-    return {
-      totalProjects: projects.length,
-      totalValue,
-      averagePrice: projects.length > 0 ? totalValue / projects.length : 0,
-      propertyTypes,
-      topDevelopers,
-      recentProjects,
-      priceRange: { under500k, under1m, under2m, over2m }
-    };
-  };
-
-  const calculateTrends = (projects: Project[]) => {
-    const now = new Date();
-    const days = 30;
-    const startCurrent = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const startPrev = new Date(startCurrent.getTime() - days * 24 * 60 * 60 * 1000);
-
-    const inRange = (dateStr?: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      return !isNaN(d.getTime()) && d >= startCurrent && d <= now;
-    };
-    const inPrevRange = (dateStr?: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      return !isNaN(d.getTime()) && d >= startPrev && d < startCurrent;
-    };
-
-    const parsePrice = (p?: string) => {
-      if (!p) return NaN;
-      const n = parseFloat(p.replace(/[^0-9.]/g, ''));
-      return isNaN(n) ? NaN : n;
-    };
-
-    let currCount = 0, prevCount = 0;
-    let currValue = 0, prevValue = 0;
-    let currValueCount = 0, prevValueCount = 0;
-
-    projects.forEach(p => {
-      const date = p.updated_at || p.created_at;
-      const price = parsePrice(p.price);
-      if (inRange(date)) {
-        currCount += 1;
-        if (!isNaN(price)) { currValue += price; currValueCount += 1; }
-      } else if (inPrevRange(date)) {
-        prevCount += 1;
-        if (!isNaN(price)) { prevValue += price; prevValueCount += 1; }
-      }
-    });
-
-    const pct = (curr: number, prev: number) => {
-      if (prev === 0) return curr > 0 ? 100 : 0;
-      return ((curr - prev) / prev) * 100;
-    };
-
-    const projectsPct = pct(currCount, prevCount);
-    const valuePct = pct(currValue, prevValue);
-    const currAvg = currValueCount ? currValue / currValueCount : 0;
-    const prevAvg = prevValueCount ? prevValue / prevValueCount : 0;
-    const avgPct = pct(currAvg, prevAvg);
-
-    return { projectsPct, valuePct, avgPct };
-  };
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+  const [newslettersLoading, setNewslettersLoading] = useState(true);
 
   const fetchNewLaunches = async () => {
     try {
@@ -240,318 +65,351 @@ export default function Dashboard() {
     }
   };
 
+  const fetchNewsletters = async () => {
+    try {
+      const response = await fetch("/api/newsletters?page=1&limit=3", { cache: 'no-store' });
+      if (!response.ok) throw new Error("Failed to fetch newsletters");
+      const data = await response.json();
+      setNewsletters(data.newsletters || []);
+      setNewslettersLoading(false);
+    } catch (err: any) {
+      console.error("Error fetching newsletters:", err);
+      setNewslettersLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchProjects();
     fetchNewLaunches();
+    fetchNewsletters();
   }, []);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const getStatusColor = (status: string) => {
+    const lowerStatus = status.toLowerCase();
+    if (lowerStatus.includes('coming') || lowerStatus.includes('preview')) {
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    } else if (lowerStatus.includes('ongoing')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    } else if (lowerStatus.includes('completed')) {
+      return 'bg-gray-50 text-gray-700 border-gray-200';
+    }
+    return 'bg-blue-50 text-blue-700 border-blue-200';
   };
-
-  const formatPercentage = (value: number, total: number) => {
-    return ((value / total) * 100).toFixed(1);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoadingSpinner message="Loading dashboard..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <p className="text-red-600">Error: {error}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b mb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Dashboard
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Manage your content and collections
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/new-launch-collection/new')}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+            <span>New Launch</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Stats Grid */}
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Property Dashboard</h1>
-              <p className="text-gray-600 mt-1">Analytics and insights for your property portfolio</p>
-              <div className="mt-2 text-sm text-gray-500">Dashboard &gt; Property Portfolio</div>
+              <p className="text-sm font-medium text-gray-600">Total Launches</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {newLaunches.length}
+              </p>
             </div>
-            <div className="flex items-center space-x-3 relative">
-              <button
-                onClick={() => router.push('/projects')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg hidden sm:flex items-center space-x-2"
-                title="View all projects"
-              >
-                <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
-                <span>View All</span>
-              </button>
-              <button
-                onClick={() => router.push('/projects/new')}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg hidden sm:flex items-center space-x-2"
-                title="Add a new project"
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                <span>Add</span>
-              </button>
-              <div className="ml-2">
-                <button
-                  className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onClick={() => setProfileOpen(!profileOpen)}
-                  aria-haspopup="menu"
-                  aria-expanded={profileOpen}
-                  title="Account menu"
-                >
-                  <span className="text-gray-600 font-semibold">AU</span>
-                </button>
-                {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-10">
-                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setProfileOpen(false); router.push('/account'); }}>
-                      Account Settings
-                    </button>
-                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setProfileOpen(false); alert('Notifications coming soon'); }}>
-                      Notifications
-                    </button>
-                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setProfileOpen(false); alert('Dark mode toggle coming soon'); }}>
-                      Toggle Dark Mode
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="rounded-lg bg-blue-50 p-3">
+              <FontAwesomeIcon icon={faWandSparkles} className="h-6 w-6 text-blue-600" />
             </div>
           </div>
+        </div>
 
-          {/* Quick Actions moved up for accessibility */}
-          <div className="pb-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => router.push('/projects/new')}
-                  className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                >
-                  <div className="text-center">
-                    <FontAwesomeIcon icon={faPlus} className="w-8 h-8 text-gray-400 mb-2" />
-                    <p className="font-medium text-gray-900">Add New Project</p>
-                    <p className="text-sm text-gray-600">Create a new property listing</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => router.push('/projects')}
-                  className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
-                >
-                  <div className="text-center">
-                    <FontAwesomeIcon icon={faEye} className="w-8 h-8 text-gray-400 mb-2" />
-                    <p className="font-medium text-gray-900">View All Projects</p>
-                    <p className="text-sm text-gray-600">Browse your property portfolio</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => router.push('/projects')}
-                  className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors"
-                >
-                  <div className="text-center">
-                    <FontAwesomeIcon icon={faEdit} className="w-8 h-8 text-gray-400 mb-2" />
-                    <p className="font-medium text-gray-900">Manage Projects</p>
-                    <p className="text-sm text-gray-600">Edit or delete existing projects</p>
-                  </div>
-                </button>
-              </div>
+        <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Launches</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {newLaunches.filter(l => l.active !== false).length}
+              </p>
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-3">
+              <FontAwesomeIcon icon={faEye} className="h-6 w-6 text-emerald-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Newsletters</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {newsletters.length}
+              </p>
+            </div>
+            <div className="rounded-lg bg-red-50 p-3">
+              <FontAwesomeIcon icon={faEnvelope} className="h-6 w-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Newsletters</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {newsletters.filter(n => n.active).length}
+              </p>
+            </div>
+            <div className="rounded-lg bg-purple-50 p-3">
+              <FontAwesomeIcon icon={faFilePdf} className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* New Launch Collection Card */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
+      {/* New Launch Collection Section */}
+      <div className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
             <h2 className="text-xl font-semibold text-gray-900">New Launch Collection</h2>
-            <button
-              onClick={() => router.push('/new-launch-collection')}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center space-x-1"
-            >
-              <span>View All</span>
-              <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
-            </button>
+            <p className="mt-1 text-sm text-gray-500">
+              Recent property launches and updates
+            </p>
           </div>
-          {launchesLoading ? (
-            <div className="text-center py-8">
+          <button
+            onClick={() => router.push('/new-launch-collection')}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <span>View All</span>
+            <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {launchesLoading ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 shadow-sm">
+            <div className="flex items-center justify-center">
               <LoadingSpinner message="Loading new launches..." />
             </div>
-          ) : newLaunches.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {newLaunches.slice(0, 3).map((launch) => (
-                <div
-                  key={launch.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/new-launch-collection/${launch.id}/edit`)}
-                >
-                  <div className="flex items-start space-x-3">
-                    {launch.image && (
-                      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                        <img
-                          src={launch.image}
-                          alt={launch.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{launch.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{launch.location}</p>
+          </div>
+        ) : newLaunches.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {newLaunches.map((launch) => (
+              <div
+                key={launch.id}
+                onClick={() => router.push(`/new-launch-collection/${launch.id}/edit`)}
+                className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:border-gray-300 hover:shadow-md cursor-pointer"
+              >
+                {/* Image Section */}
+                {launch.image ? (
+                  <div className="relative h-48 w-full overflow-hidden bg-gray-100">
+                    <img
+                      src={launch.image}
+                      alt={launch.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                  </div>
+                ) : (
+                  <div className="h-48 w-full bg-gradient-to-br from-gray-100 to-gray-200" />
+                )}
+
+                {/* Content Section */}
+                <div className="p-5">
+                  <div className="mb-3">
+                    <h3 className="mb-1 text-base font-semibold text-gray-900 line-clamp-1">
+                      {launch.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="line-clamp-1">{launch.location}</span>
                       {launch.district && (
-                        <p className="text-xs text-gray-500 mt-1">{launch.district}</p>
-                      )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        {launch.status && (
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            launch.status.toLowerCase().includes('coming') || launch.status.toLowerCase().includes('preview')
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : launch.status.toLowerCase().includes('ongoing')
-                              ? 'bg-green-100 text-green-800'
-                              : launch.status.toLowerCase().includes('completed')
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {launch.status}
-                          </span>
-                        )}
-                        {launch.price && (
-                          <span className="text-xs font-medium text-gray-700">{launch.price}</span>
-                        )}
-                      </div>
-                      {launch.launchDate && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          <FontAwesomeIcon icon={faCalendarAlt} className="w-3 h-3 mr-1" />
-                          {launch.launchDate}
-                        </p>
+                        <>
+                          <span className="text-gray-400">•</span>
+                          <span className="line-clamp-1">{launch.district}</span>
+                        </>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No new launches available</p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* PropTech CTA Card */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-        <div 
-          onClick={() => router.push('/prop-tech')}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-8 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="flex items-center space-x-6 mb-4 md:mb-0">
-              <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
-                <FontAwesomeIcon icon={faCog} className="w-10 h-10 text-white" />
+                  {/* Status and Price */}
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {launch.status && (
+                      <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium ${getStatusColor(launch.status)}`}>
+                        {launch.status}
+                      </span>
+                    )}
+                    {launch.price && (
+                      <span className="text-xs font-semibold text-gray-700">
+                        {launch.price}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Launch Date */}
+                  {launch.launchDate && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <FontAwesomeIcon icon={faCalendarAlt} className="h-3 w-3" />
+                      <span>{launch.launchDate}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 rounded-xl bg-blue-600/0 transition-colors group-hover:bg-blue-600/5" />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">PropTech Tools</h2>
-                <p className="text-blue-100 text-lg">
-                  Access powerful property technology calculators and tools to enhance your real estate operations
-                </p>
-              </div>
-            </div>
-            <button className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center space-x-2 shadow-lg">
-              <span>Explore PropTech</span>
-              <FontAwesomeIcon icon={faArrowRight} className="w-4 h-4" />
-            </button>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 shadow-sm">
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                <FontAwesomeIcon icon={faWandSparkles} className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">No new launches available</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Get started by creating your first launch
+              </p>
+              <button
+                onClick={() => router.push('/new-launch-collection/new')}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+                <span>Create Launch</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {stats && (
-          <>
-            {/* Top Developers and Recent Projects */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Top Developers */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Developers</h3>
-                <div className="space-y-3">
-                  {stats.topDevelopers && Object.keys(stats.topDevelopers).length > 0 ? (
-                    Object.entries(stats.topDevelopers).map(([developer, count], index) => (
-                      <div key={developer} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                            index === 0 ? 'bg-yellow-500' : 
-                            index === 1 ? 'bg-gray-400' : 
-                            index === 2 ? 'bg-orange-500' : 'bg-blue-500'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <span className="font-medium text-gray-900">{developer}</span>
-                        </div>
-                        <span className="text-sm text-gray-600">{count} projects</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No developer data available</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {/* Newsletters Section */}
+      <div className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Recent Newsletters</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Latest newsletter PDFs and updates
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/newsletters')}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <span>View All</span>
+            <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-              {/* Recent Projects */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Recent Projects</h3>
-                  <button
-                    onClick={() => router.push('/projects')}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    View All
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {stats.recentProjects && stats.recentProjects.length > 0 ? (
-                    stats.recentProjects.map((project) => (
-                      <div key={project.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <FontAwesomeIcon icon={faBuilding} className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{project.name}</p>
-                            <p className="text-sm text-gray-600">{project.type}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-gray-900">{project.price}</p>
-                          <p className="text-sm text-gray-600">{getDeveloperName(project.developer)}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No recent projects available</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+        {newslettersLoading ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 shadow-sm">
+            <div className="flex items-center justify-center">
+              <LoadingSpinner message="Loading newsletters..." />
             </div>
-          </>
+          </div>
+        ) : newsletters.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {newsletters.slice(0, 3).map((newsletter) => (
+              <div
+                key={newsletter.id}
+                onClick={() => window.open(newsletter.url, '_blank')}
+                className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:border-red-300 hover:shadow-md cursor-pointer"
+              >
+                <div className="p-5">
+                  <div className="mb-3 flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="rounded-lg bg-red-50 p-2">
+                          <FontAwesomeIcon icon={faFilePdf} className="h-5 w-5 text-red-600" />
+                        </div>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                          newsletter.active
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {newsletter.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-900 mb-1">
+                        Newsletter
+                      </h3>
+                      <p className="text-sm font-medium text-gray-600">
+                        {newsletter.date}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-2 text-sm text-blue-600 group-hover:text-blue-700">
+                    <span className="font-medium">View PDF</span>
+                    <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </div>
+
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 rounded-xl bg-red-600/0 transition-colors group-hover:bg-red-600/5" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 shadow-sm">
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                <FontAwesomeIcon icon={faEnvelope} className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">No newsletters available</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Get started by creating your first newsletter
+              </p>
+              <button
+                onClick={() => router.push('/newsletters/new')}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+                <span>Create Newsletter</span>
+              </button>
+            </div>
+          </div>
         )}
+      </div>
+
+      {/* PropTech CTA Section */}
+      <div 
+        onClick={() => router.push('/prop-tech')}
+        className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-8 shadow-xl transition-all hover:shadow-2xl cursor-pointer"
+      >
+        <div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+          <div className="flex items-start gap-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm transition-transform group-hover:scale-110">
+              <FontAwesomeIcon icon={faCog} className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h2 className="mb-2 text-2xl font-bold text-white">
+                PropTech Tools
+              </h2>
+              <p className="max-w-md text-blue-100">
+                Access powerful property technology calculators and tools to enhance your real estate operations
+              </p>
+            </div>
+          </div>
+          <button className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-blue-600 shadow-lg transition-all hover:bg-blue-50 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600">
+            <span>Explore PropTech</span>
+            <FontAwesomeIcon icon={faArrowRight} className="h-4 w-4" />
+          </button>
+        </div>
+        
+        {/* Decorative Elements */}
+        <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-purple-500/20 blur-3xl" />
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEdit, faTrash, faChevronLeft, faChevronRight, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faEdit, faTrash, faChevronLeft, faChevronRight, faPlus, faEllipsisVertical } from "@fortawesome/free-solid-svg-icons";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -142,6 +142,7 @@ export default function NewLaunchCollectionPage() {
   const [sortBy, setSortBy] = useState<string>("Latest Added");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: number; title: string } | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const fetchLaunches = async (page: number = currentPage) => {
     setLoading(true);
@@ -512,7 +513,7 @@ export default function NewLaunchCollectionPage() {
               <tbody>
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-4 text-center text-gray-500">
                       No New Launch items found.
                     </td>
                   </tr>
@@ -554,25 +555,45 @@ export default function NewLaunchCollectionPage() {
                       <td className="px-4 py-2">{item.bedrooms}</td>
                       <td className="px-4 py-2 font-medium text-green-600">From ${item.price}</td>
                       <td className="px-4 py-2">
-                        <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="relative">
                           <button
-                            onClick={() => handleEdit(item)}
-                            className="inline-flex items-center gap-1 px-3 h-8 rounded-full border text-blue-600 hover:bg-blue-50"
-                            title="Edit"
-                            aria-label="Edit"
+                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Actions"
+                            aria-label="Actions"
                           >
-                            <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                            <span className="text-[12px]">Edit</span>
+                            <FontAwesomeIcon icon={faEllipsisVertical} className="w-5 h-5" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="inline-flex items-center gap-1 px-3 h-8 rounded-full border text-red-600 hover:bg-red-50"
-                            title="Delete"
-                            aria-label="Delete"
-                          >
-                            <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
-                            <span className="text-[12px]">Delete</span>
-                          </button>
+                          {openMenuId === item.id && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => setOpenMenuId(null)}
+                              />
+                              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                                <button
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    handleEdit(item);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <FontAwesomeIcon icon={faEdit} className="w-4 h-4 text-blue-600" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    handleDelete(item.id);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
